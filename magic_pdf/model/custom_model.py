@@ -75,11 +75,26 @@ class MonkeyOCR:
         logger.info(f'VLM loaded: {self.chat_model.model_name}')
 
 class MonkeyChat:
-    def __init__(self, model_path, engine_config=None):
+    def __init__(self, model_path, engine_config=None): 
         self.model_name = os.path.basename(model_path)
-        self.engine_config = engine_config or PytorchEngineConfig(session_len=10240)
+        self.engine_config = self.auto_config_dtype(engine_config)
         self.pipe = pipeline(model_path, backend_config=self.engine_config, chat_template_config=ChatTemplateConfig('qwen2d5-vl'))
         self.gen_config=GenerationConfig(max_new_tokens=4096,do_sample=True,temperature=0,repetition_penalty=1.05)
+
+    def auto_config_dtype(self, engine_config=None):
+        if engine_config is None:
+            engine_config = PytorchEngineConfig(session_len=10240)
+        dtype = "bfloat16"
+        if torch.cuda.is_available():
+            device = torch.cuda.current_device()
+            capability = torch.cuda.get_device_capability(device)
+            sm_version = capability[0] * 10 + capability[1]  # 例如 sm75 = 7.5
+            
+            # 如果计算能力小于等于 sm75 (7.5), 使用 float16
+            if sm_version <= 75:
+                dtype = "float16"
+        engine_config.dtype = dtype
+        return engine_config
     
     def batch_inference(self, images, questions):
         inputs = [(question, load_image(image)) for image, question in zip(images, questions)]
