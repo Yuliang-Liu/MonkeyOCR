@@ -88,9 +88,9 @@ class MonkeyChat:
         if torch.cuda.is_available():
             device = torch.cuda.current_device()
             capability = torch.cuda.get_device_capability(device)
-            sm_version = capability[0] * 10 + capability[1]  # 例如 sm75 = 7.5
+            sm_version = capability[0] * 10 + capability[1]  # e.g. sm75 = 7.5
             
-            # 如果计算能力小于等于 sm75 (7.5), 使用 float16
+            # use float16 if computing capability <= sm75 (7.5)
             if sm_version <= 75:
                 dtype = "float16"
         engine_config.dtype = dtype
