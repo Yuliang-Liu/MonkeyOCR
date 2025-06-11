@@ -97,15 +97,32 @@ pip install pdf2image==1.17.0
 # Start demo
 python demo/demo_gradio.py
 ```
-### Change Inference Backend for **RTX 3090 / 4090** GPUs (Optional)
+### Fix **shared memory error** on **RTX 3090 / 4090 / ...** GPUs (Optional)
 
-Our 3B model can run efficiently on NVIDIA 3090. However, when using **LMDeploy** as the inference backend, you may encounter compatibility issues on **RTX 3090 / 4090** GPUs. Specifically, the following error may occur:
+Our 3B model runs efficiently on NVIDIA RTX 3090. However, when using **LMDeploy** as the inference backend, you may encounter compatibility issues on **RTX 3090 / 4090** GPUs — particularly the following error:
 
 ```
 triton.runtime.errors.OutOfResources: out of resource: shared memory
 ```
 
-To work around this issue, we recommend switching the inference backend to **transformers**. Please follow the steps below:
+To work around this issue, you can apply the patch below:
+
+```bash
+python tools/lmdeploy_patcher.py patch
+```
+
+> ⚠️ **Note:** This command will modify LMDeploy's source code in your environment.
+> To revert the changes, simply run:
+
+```bash
+python tools/lmdeploy_patcher.py restore
+```
+
+**Special thanks to [@pineking](https://github.com/pineking) for the solution!**
+
+### Switch inference backend (Optional)
+
+You can switch inference backend to `transformers` following the steps below:
 
 1. Install required dependency (if not already installed):
    ```bash
