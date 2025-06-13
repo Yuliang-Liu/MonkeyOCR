@@ -72,9 +72,10 @@ python tools/download_model.py -t modelscope
 ### 3. Inference
 ```bash
 # Make sure in MonkeyOCR directory
-python parse.py path/to/your.pdf
-# or with image as input
-pyhton parse.py path/to/your/image
+# End to end parsing
+python parse.py path/to/pdf_or_image
+# Single task recognition (only output markdown)
+python parse.py path/to/pdf_or_image -t text/formula/table
 # Specify output path and model configs path
 python parse.py path/to/your.pdf -o ./output -c config.yaml
 ```
