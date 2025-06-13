@@ -149,11 +149,8 @@ class MonkeyChat_transformers:
                         model_path,
                         torch_dtype=torch.bfloat16,
                         attn_implementation="flash_attention_2",
-                        device_map="auto",
+                        device_map=self.device,
                     )
-            
-            if self.device != 'cuda':
-                self.model = self.model.to(self.device)
                 
             self.processor = AutoProcessor.from_pretrained(
                 model_path,
