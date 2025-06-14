@@ -30,20 +30,6 @@ else
     log_warn "NVIDIA GPU not detected"
 fi
 
-# # Apply LMDeploy patch if requested
-# if [ "$LMDEPLOY_PATCHED" = "true" ]; then
-#     log_info "Applying LMDeploy patch for RTX 3090/4090 compatibility..."
-#     if [ -f "/app/MonkeyOCR/tools/lmdeploy_patcher.py" ]; then
-#         if python /app/MonkeyOCR/tools/lmdeploy_patcher.py patch; then
-#             log_info "LMDeploy patch applied successfully"
-#         else
-#             log_warn "Failed to apply LMDeploy patch, continuing without patch"
-#         fi
-#     else
-#         log_warn "LMDeploy patcher not found, skipping patch"
-#     fi
-# fi
-
 # Download models
 log_info "Checking and downloading models..."
 if /app/MonkeyOCR/download_models.sh; then
