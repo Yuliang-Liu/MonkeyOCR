@@ -1,0 +1,63 @@
+x-monkeyocr-base: &monkeyocr-base
+  image: monkeyocr:latest
+  volumes:
+    - model_data:/app/MonkeyOCR/model_weight
+  environment:
+    - TMPDIR=/app/tmp
+    - CUDA_VISIBLE_DEVICES=0
+    - HF_HUB_CACHE=/app/MonkeyOCR/model_weight
+    - MODELSCOPE_CACHE=/app/MonkeyOCR/model_weight
+  deploy:
+    resources:
+      reservations:
+        devices:
+          - driver: nvidia
+            count: 1
+            capabilities: [gpu]
+
+services:
+  monkeyocr:
+    <<: *monkeyocr-base
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      args:
+        BUILDKIT_INLINE_CACHE: "1"
+        LMDEPLOY_PATCHED: "false"
+    ports:
+      - "7860:7860"
+
+  monkeyocr-fix:
+    <<: *monkeyocr-base
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      args:
+        BUILDKIT_INLINE_CACHE: "1"
+        LMDEPLOY_PATCHED: "true"
+    environment:
+      - TMPDIR=/app/tmp
+      - CUDA_VISIBLE_DEVICES=0
+      - HF_HUB_CACHE=/app/MonkeyOCR/model_weight
+      - MODELSCOPE_CACHE=/app/MonkeyOCR/model_weight
+    ports:
+      - "7860:7860"
+
+  monkeyocr-demo:
+    <<: *monkeyocr-base
+    entrypoint: ["/app/MonkeyOCR/entrypoint.sh"]
+    command: ["demo"]
+    ports:
+      - "7860:7860"
+
+  monkeyocr-dev:
+    <<: *monkeyocr-base
+    entrypoint: ["/app/MonkeyOCR/entrypoint.sh"]
+    command: ["bash"]
+    stdin_open: true
+    tty: true
+    ports:
+      - "7860:7860"
+
+volumes:
+  model_data:

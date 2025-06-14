@@ -474,4 +474,4 @@ with gr.Blocks(theme="ocean", css=css, title='MonkeyOCR') as demo:
         show_progress=False
     )
 
-demo.queue().launch(server_name="0.0.0.0", server_port=7685, debug=True)
+demo.queue().launch(server_name="0.0.0.0", server_port=7860, debug=True)

@@ -41,8 +41,8 @@ Currently, our model is deployed on a single GPU, so if too many users upload fi
 * ```2025.06.05 ``` 🚀 We release MonkeyOCR, an English and Chinese documents parsing model.
 
 
-## Quick Start
-
+# Quick Start
+## Locally Install
 ### 1. Install MonkeyOCR
 ```bash
 conda create -n MonkeyOCR python=3.10
@@ -165,6 +165,45 @@ chat_config:
   backend: transformers
   batch_size: 10  # Adjust based on your available GPU memory
 ```
+
+## Docker Deployment
+
+1. Navigate to the `docker` directory:
+
+   ```bash
+   cd docker
+   ```
+
+2. **Prerequisite:** Ensure NVIDIA GPU support is available in Docker (via `nvidia-docker2`).
+   If GPU support is not enabled, run the following to set up the environment:
+
+   ```bash
+   bash env.sh
+   ```
+
+3. Build the Docker image:
+
+   ```bash
+   docker compose build monkeyocr
+   ```
+
+   > **Note:** If your GPU is from the 30-series, 40-series, or similar, build the patched image for LMDeploy compatibility:
+
+   ```bash
+   docker compose build monkeyocr-fix
+   ```
+
+4. Run the container with the Gradio demo (accessible on port 7860):
+
+   ```bash
+   docker compose up monkeyocr-demo
+   ```
+
+   Alternatively, start an interactive development environment:
+
+   ```bash
+   docker compose run --rm monkeyocr-dev
+   ```
 
 
 ## Benchmark Results

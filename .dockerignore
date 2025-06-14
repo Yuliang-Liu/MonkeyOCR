@@ -1,0 +1,45 @@
+# Git related
+.git
+.gitignore
+
+# Python cache and build files
+__pycache__/
+*.py[cod]
+*.pyc
+*.pyo
+*.egg-info/
+build/
+dist/
+
+# IDE and editors
+.vscode/
+.idea/
+.history/
+
+# System files
+.DS_Store
+*.log
+
+# Temporary files and debugging
+temp/
+tmp/
+debug/
+cli_debug/
+debug_utils/
+
+# Frontend build files
+projects/web/node_modules/
+projects/web/dist/
+projects/web_demo/web_demo/static/
+
+# Development environment files
+.env
+source.dev.env
+sync1.sh
+
+# Documentation build
+_build/
+
+output/
+model_weight/
+requirements.txt
