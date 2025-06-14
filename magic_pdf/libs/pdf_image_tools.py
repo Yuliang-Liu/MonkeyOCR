@@ -9,7 +9,6 @@ from magic_pdf.libs.hash_utils import compute_sha256
 
 
 def cut_image(bbox: tuple, page_num: int, page: fitz.Page, return_path, imageWriter: DataWriter):
-    """"""
 
     filename = f'{page_num}_{int(bbox[0])}_{int(bbox[1])}_{int(bbox[2])}_{int(bbox[3])}'
 

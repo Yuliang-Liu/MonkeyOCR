@@ -1,5 +1,3 @@
-""""""
-
 from collections import Counter
 
 import fitz
@@ -60,7 +58,6 @@ def process_image(page, junk_img_bojids=[]):
 
 
 def get_image_info(doc: fitz.Document, page_width_pts, page_height_pts) -> list:
-    """"""
 
     img_bojid_counter = Counter(img[0] for page in doc for img in page.get_images())
 
@@ -179,7 +176,6 @@ def get_pdf_textlen_per_page(doc: fitz.Document):
 
 
 def get_pdf_text_layout_per_page(doc: fitz.Document):
-    """"""
     text_layout_list = []
 
     for page_id, page in enumerate(doc):
@@ -251,9 +247,6 @@ def get_pdf_text_layout_per_page(doc: fitz.Document):
     return text_layout_list
 
 
-""""""
-
-
 class PageSvgsTooManyError(Exception):
     def __init__(self, message='Page SVGs are too many'):
         self.message = message
@@ -285,7 +278,6 @@ def get_imgs_per_page(doc: fitz.Document):
 
 
 def get_language(doc: fitz.Document):
-    """"""
     language_lst = []
     for page_id, page in enumerate(doc):
         if page_id >= scan_max_page:
@@ -305,13 +297,11 @@ def get_language(doc: fitz.Document):
 
 
 def check_invalid_chars(pdf_bytes):
-    """"""
     # return detect_invalid_chars_by_pymupdf(pdf_bytes)
     return detect_invalid_chars(pdf_bytes)
 
 
 def pdf_meta_scan(pdf_bytes: bytes):
-    """"""
     doc = fitz.open('pdf', pdf_bytes)
     is_needs_password = doc.needs_pass
     is_encrypted = doc.is_encrypted

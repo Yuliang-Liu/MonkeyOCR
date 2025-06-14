@@ -7,7 +7,6 @@ from pdfminer.high_level import extract_text
 
 
 def calculate_sample_count(total_page: int):
-    """"""
     select_page_cnt = min(10, total_page)
     return select_page_cnt
 
@@ -32,15 +31,12 @@ def extract_pages(src_pdf_bytes: bytes) -> fitz.Document:
 
 
 def detect_invalid_chars(src_pdf_bytes: bytes) -> bool:
-    """"""
-    """"""
     sample_docs = extract_pages(src_pdf_bytes)
     sample_pdf_bytes = sample_docs.tobytes()
     sample_pdf_file_like_object = BytesIO(sample_pdf_bytes)
     text = extract_text(sample_pdf_file_like_object)
     text = text.replace("\n", "")
     # logger.info(text)
-    """"""
     cid_pattern = re.compile(r'\(cid:\d+\)')
     matches = cid_pattern.findall(text)
     cid_count = len(matches)
@@ -51,7 +47,6 @@ def detect_invalid_chars(src_pdf_bytes: bytes) -> bool:
     else:
         cid_chars_radio = cid_count/(cid_count + text_len - cid_len)
     logger.info(f"cid_count: {cid_count}, text_len: {text_len}, cid_chars_radio: {cid_chars_radio}")
-    """"""
     if cid_chars_radio > 0.05:
         return False
     else:
@@ -59,7 +54,6 @@ def detect_invalid_chars(src_pdf_bytes: bytes) -> bool:
 
 
 def count_replacement_characters(text: str) -> int:
-    """"""
     return text.count('\ufffd')
 
 
@@ -76,7 +70,6 @@ def detect_invalid_chars_by_pymupdf(src_pdf_bytes: bytes) -> bool:
     else:
         uffd_chars_radio = uffd_count / text_len
     logger.info(f"uffd_count: {uffd_count}, text_len: {text_len}, uffd_chars_radio: {uffd_chars_radio}")
-    """"""
     if uffd_chars_radio > 0.01:
         return False
     else:

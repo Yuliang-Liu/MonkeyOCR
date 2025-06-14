@@ -244,7 +244,6 @@ def txt_spans_extract_v2(pdf_page, spans, all_bboxes, all_discarded_blocks, lang
 
                 break
 
-    """"""
     if len(vertical_spans) > 0:
         text_blocks = pdf_page.get_text('dict', flags=fitz.TEXTFLAGS_TEXT)['blocks']
         all_pymu_lines = []
@@ -263,7 +262,6 @@ def txt_spans_extract_v2(pdf_page, spans, all_bboxes, all_discarded_blocks, lang
             if len(span['content']) == 0:
                 spans.remove(span)
 
-    """"""
     new_spans = []
 
     for span in useful_spans + unuseful_spans:
@@ -611,11 +609,9 @@ def parse_page_core(
     need_drop = False
     drop_reason = []
 
-    """"""
     img_groups = magic_model.get_imgs_v2(page_id)
     table_groups = magic_model.get_tables_v2(page_id)
 
-    """"""
     img_body_blocks, img_caption_blocks, img_footnote_blocks = process_groups(
         img_groups, 'image_body', 'image_caption_list', 'image_footnote_list'
     )
@@ -698,7 +694,6 @@ def parse_page_core(
         for b in to_remove_blocks:
             blocks.remove(b)
 
-    """"""
 
     interline_equation_blocks = []
     if len(interline_equation_blocks) > 0:
@@ -724,22 +719,15 @@ def parse_page_core(
             page_h,
         )
 
-    """"""
     spans = magic_model.get_all_spans(page_id)
 
-    """"""
-    """"""
     spans = remove_outside_spans(spans, all_bboxes, all_discarded_blocks)
 
-    """"""
     spans, dropped_spans_by_confidence = remove_overlaps_low_confidence_spans(spans)
-    """"""
     spans, dropped_spans_by_span_overlap = remove_overlaps_min_spans(spans)
 
-    """"""
     if parse_mode == SupportedPdfParseMethod.TXT:
 
-        """"""
         spans = txt_spans_extract_v2(page_doc, spans, all_bboxes, all_discarded_blocks, lang)
 
     elif parse_mode == SupportedPdfParseMethod.OCR:
@@ -747,13 +735,11 @@ def parse_page_core(
     else:
         raise Exception('parse_mode must be txt or ocr')
 
-    """"""
     discarded_block_with_spans, spans = fill_spans_in_blocks(
         all_discarded_blocks, spans, 0.4
     )
     fix_discarded_blocks = fix_discarded_block(discarded_block_with_spans)
 
-    """"""
     if len(all_bboxes) == 0:
         logger.warning(f'skip this page, not found useful bbox, page_id: {page_id}')
         return ocr_construct_page_component_v2(
@@ -771,44 +757,32 @@ def parse_page_core(
             drop_reason,
         )
 
-    """"""
     spans = ocr_cut_image_and_table(
         spans, page_doc, page_id, pdf_bytes_md5, imageWriter
     )
 
-    """"""
     block_with_spans, spans = fill_spans_in_blocks(all_bboxes, spans, 0.5)
 
-    """"""
     fix_blocks = fix_block_spans_v2(block_with_spans)
 
-    """"""
     merge_title_blocks(fix_blocks)
 
-    """"""
     line_height = get_line_height(fix_blocks)
 
-    """"""
     sorted_bboxes = sort_lines_by_model(fix_blocks, page_w, page_h, line_height, MonkeyOCR_model)
 
-    """"""
     fix_blocks = cal_block_index(fix_blocks, sorted_bboxes)
 
-    """"""
     fix_blocks = revert_group_blocks(fix_blocks)
 
-    """"""
     sorted_blocks = sorted(fix_blocks, key=lambda b: b['index'])
 
-    """"""
     for block in sorted_blocks:
         if block['type'] in [BlockType.Image, BlockType.Table]:
             block['blocks'] = sorted(block['blocks'], key=lambda b: b['index'])
 
-    """"""
     images, tables, interline_equations = get_qa_need_list_v2(sorted_blocks)
 
-    """"""
     page_info = ocr_construct_page_component_v2(
         sorted_blocks,
         [],
@@ -840,13 +814,10 @@ def pdf_parse_union(
 
     pdf_bytes_md5 = compute_md5(dataset.data_bits())
 
-    """"""
     pdf_info_dict = {}
 
-    """"""
     magic_model = MagicModel(model_list, dataset)
 
-    """"""
     # end_page_id = end_page_id if end_page_id else len(pdf_docs) - 1
     end_page_id = (
         end_page_id
@@ -858,11 +829,9 @@ def pdf_parse_union(
         logger.warning('end_page_id is out of range, use pdf_docs length')
         end_page_id = len(dataset) - 1
 
-    """"""
     start_time = time.time()
 
     for page_id, page in enumerate(dataset):
-        """"""
         if debug_mode:
             time_now = time.time()
             logger.info(
@@ -870,7 +839,6 @@ def pdf_parse_union(
             )
             start_time = time_now
 
-        """"""
         if start_page_id <= page_id <= end_page_id:
             page_info = parse_page_core(
                 page, magic_model, page_id, pdf_bytes_md5, imageWriter, parse_mode, lang, MonkeyOCR_model
@@ -884,10 +852,8 @@ def pdf_parse_union(
             )
         pdf_info_dict[f'page_{page_id}'] = page_info
 
-    """"""
     para_split(pdf_info_dict)
 
-    """"""
     pdf_info_list = dict_to_list(pdf_info_dict)
     new_pdf_info_dict = {
         'pdf_info': pdf_info_list,

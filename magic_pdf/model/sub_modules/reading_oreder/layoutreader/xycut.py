@@ -4,7 +4,6 @@ import numpy as np
 
 
 def projection_by_bboxes(boxes: np.array, axis: int) -> np.ndarray:
-    """"""
     assert axis in [0, 1]
     length = np.max(boxes[:, axis::2])
     res = np.zeros(length, dtype=int)
@@ -59,7 +58,6 @@ def split_projection_profile(arr_values: np.array, min_value: float, min_gap: fl
 
 
 def recursive_xy_cut(boxes: np.ndarray, indices: List[int], res: List[int]):
-    """"""
 
     assert len(boxes) == len(indices)
 

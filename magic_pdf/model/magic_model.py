@@ -21,7 +21,6 @@ class PosRelationEnum(enum.Enum):
 
 
 class MagicModel:
-    """"""
 
     def __fix_axis(self):
         for model_page_info in self.__model_list:
@@ -106,11 +105,8 @@ class MagicModel:
     def __init__(self, model_list: list, docs: Dataset):
         self.__model_list = model_list
         self.__docs = docs
-        """"""
         self.__fix_axis()
-        """"""
         self.__fix_by_remove_low_confidence()
-        """"""
         self.__fix_by_remove_high_iou_and_low_confidence()
         self.__fix_footnote()
 
@@ -546,7 +542,6 @@ class MagicModel:
         model_page_info = self.__model_list[page_no]
         layout_dets = model_page_info['layout_dets']
         allow_category_id_list = [3, 5, 13, 14, 15]
-        """"""
 
 
 

@@ -1,5 +1,3 @@
-""""""
-
 import os
 
 from loguru import logger
@@ -11,11 +9,9 @@ import yaml
 CONFIG_FILE_NAME = os.getenv('MONKEYOCR_MODEL_CONFIGS', 'model_configs.yaml')
 
 def get_base_directory(path):
-    """"""
     return os.path.dirname(os.path.dirname(os.path.dirname(path)))
 
 def get_current_file_parent_parent_dir():
-    """"""
     current_file = os.path.abspath(__file__)
     return get_base_directory(current_file)
 
@@ -32,7 +28,6 @@ def read_config():
 
 
 def get_s3_config(bucket_name: str):
-    """"""
     config = read_config()
 
     bucket_info = config.get('bucket_info')

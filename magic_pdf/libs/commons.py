@@ -4,7 +4,6 @@ def join_path(*args):
 
 
 def get_top_percent_list(num_list, percent):
-    """"""
     if len(num_list) == 0:
         top_percent_list = []
     else:
@@ -25,7 +24,6 @@ def mymax(alist: list):
 
 
 def parse_bucket_key(s3_full_path: str):
-    """"""
     s3_full_path = s3_full_path.strip()
     if s3_full_path.startswith("s3://"):
         s3_full_path = s3_full_path[5:]

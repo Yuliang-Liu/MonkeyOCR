@@ -11,19 +11,14 @@ from PIL import Image
 from magic_pdf.config.constants import MODEL_NAME
 from io import BytesIO
 from PIL import Image
-import requests
 from magic_pdf.model.sub_modules.model_utils import (
-    clean_vram, crop_img, get_res_list_from_layout_res)
-# from magic_pdf.operators.models import InferenceResult
+    clean_vram, crop_img)
 
 YOLO_LAYOUT_BASE_BATCH_SIZE = 1
-MFD_BASE_BATCH_SIZE = 1
-MFR_BASE_BATCH_SIZE = 16
 
 class BatchAnalyzeLLM:
-    def __init__(self, model, batch_ratio: int):
+    def __init__(self, model):
         self.model = model
-        self.batch_ratio = batch_ratio
 
     def __call__(self, images: list) -> list:
         images_layout_res = []

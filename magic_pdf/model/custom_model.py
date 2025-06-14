@@ -148,7 +148,7 @@ class MonkeyChat_transformers:
             self.model = Qwen2_5_VLForConditionalGeneration.from_pretrained(
                         model_path,
                         torch_dtype=torch.bfloat16,
-                        attn_implementation="flash_attention_2",
+                        attn_implementation="flash_attention_2" if self.device != 'cpu' else 'sdpa',
                         device_map=self.device,
                     )
                 

@@ -83,40 +83,31 @@ def ocr_prepare_bboxes_for_layout_split_v2(
     add_bboxes(title_blocks, BlockType.Title, all_bboxes)
     add_bboxes(interline_equation_blocks, BlockType.InterlineEquation, all_bboxes)
 
-    """"""
-    """"""
     all_bboxes = fix_text_overlap_title_blocks(all_bboxes)
-    """"""
     all_bboxes = remove_need_drop_blocks(all_bboxes, discarded_blocks)
 
 
-    """"""
     all_bboxes = fix_interline_equation_overlap_text_blocks_with_hi_iou(all_bboxes)
-    """"""
 
 
     """discarded_blocks"""
     all_discarded_blocks = []
     add_bboxes(discarded_blocks, BlockType.Discarded, all_discarded_blocks)
 
-    """"""
     footnote_blocks = []
     for discarded in discarded_blocks:
         x0, y0, x1, y1 = discarded['bbox']
         if (x1 - x0) > (page_w / 3) and (y1 - y0) > 10 and y0 > (page_h / 2):
             footnote_blocks.append([x0, y0, x1, y1])
 
-    """"""
     need_remove_blocks = find_blocks_under_footnote(all_bboxes, footnote_blocks)
     if len(need_remove_blocks) > 0:
         for block in need_remove_blocks:
             all_bboxes.remove(block)
             all_discarded_blocks.append(block)
 
-    """"""
     all_bboxes = remove_overlaps_min_blocks(all_bboxes)
     all_discarded_blocks = remove_overlaps_min_blocks(all_discarded_blocks)
-    """"""
     # all_bboxes, drop_reasons = remove_overlap_between_bbox_for_block(all_bboxes)
     all_bboxes.sort(key=lambda x: x[0]+x[1])
     return all_bboxes, all_discarded_blocks
