@@ -50,7 +50,7 @@ RUN mkdir -p /app/MonkeyOCR/model_weight && chown -R appuser:appuser /app/Monkey
 ARG LMDEPLOY_PATCHED=false
 RUN if [ "$LMDEPLOY_PATCHED" = "true" ]; then \
       python /app/MonkeyOCR/tools/lmdeploy_patcher.py patch; \
-      echo "Successfully apply lmdeploy patch"
+      echo "Successfully apply lmdeploy patch" \
     else \
       echo "LMDEPLOY_PATCHED is false, skipping patch"; \
     fi
