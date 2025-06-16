@@ -119,7 +119,7 @@ def single_task_recognition(input_file, output_dir, MonkeyOCR_model, task):
         raise FileNotFoundError(f"Input file does not exist: {input_file}")
     
     # Get filename
-    name_without_suff = os.path.basename(input_file).split(".")[0]
+    name_without_suff = '.'.join(os.path.basename(input_file).split(".")[:-1])
     
     # Prepare output directory
     local_md_dir = os.path.join(output_dir, name_without_suff)
@@ -207,7 +207,7 @@ def parse_pdf(input_file, output_dir, MonkeyOCR_model):
         raise FileNotFoundError(f"Input file does not exist: {input_file}")
     
     # Get filename
-    name_without_suff = os.path.basename(input_file).split(".")[0]
+    name_without_suff = '.'.join(os.path.basename(input_file).split(".")[:-1])
     
     # Prepare output directory
     local_image_dir = os.path.join(output_dir, name_without_suff, "images")

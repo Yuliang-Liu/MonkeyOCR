@@ -13,7 +13,7 @@ MonkeyOCR_model = MonkeyOCR('model_configs.yaml')
 total_time = 0
 # for i in range(1,11):
 pdf_file_name = f"demo/demo1.pdf"  # replace with the real pdf path
-name_without_suff = os.path.basename(pdf_file_name).split(".")[0]
+name_without_suff = '.'.join(os.path.basename(pdf_file_name).split(".")[:-1])
 
 # prepare env
 local_image_dir, local_md_dir = f"output/{name_without_suff}/images", f"output/{name_without_suff}"
