@@ -381,7 +381,7 @@ def para_split(pdf_info_dict):
             block['page_size'] = page['page_size']
         all_blocks.extend(blocks)
 
-    __para_merge_page(all_blocks)
+    # __para_merge_page(all_blocks)
     for page_num, page in pdf_info_dict.items():
         page['para_blocks'] = []
         for block in all_blocks:
