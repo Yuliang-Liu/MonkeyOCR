@@ -147,6 +147,11 @@ python demo/demo_gradio.py
    docker compose run --rm monkeyocr-dev
    ```
 
+5. Run the FastAPI service (accessible on port 7861):
+   ```bash
+   docker compose up monkeyocr-api
+   ```
+
 
 ## Benchmark Results
 

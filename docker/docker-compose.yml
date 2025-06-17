@@ -59,5 +59,19 @@ services:
     ports:
       - "7860:7860"
 
+  monkeyocr-api:
+    <<: *monkeyocr-base
+    entrypoint: ["/app/MonkeyOCR/entrypoint.sh"]
+    command: ["fastapi"]
+    ports:
+      - "7861:7861"
+    environment:
+      - TMPDIR=/app/tmp
+      - CUDA_VISIBLE_DEVICES=0
+      - HF_HUB_CACHE=/app/MonkeyOCR/model_weight
+      - MODELSCOPE_CACHE=/app/MonkeyOCR/model_weight
+      - FASTAPI_HOST=0.0.0.0
+      - FASTAPI_PORT=7861
+
 volumes:
   model_data:
