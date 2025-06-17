@@ -14,3 +14,4 @@ qwen_vl_utils==0.0.10
 matplotlib
 doclayout_yolo==0.0.2b1
 PyYAML
+dill>=0.3.8,<1
