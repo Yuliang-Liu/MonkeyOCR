@@ -9,10 +9,7 @@ PyMuPDF>=1.24.9,<=1.24.14
 scikit-learn>=1.0.2
 pdfminer.six==20231228
 pycocotools>=2.0.6
-torch==2.5.1
-torchvision==0.20.1
-transformers==4.50.0
-lmdeploy==0.8.0
+transformers==4.52.4
 qwen_vl_utils==0.0.10
 matplotlib
 doclayout_yolo==0.0.2b1

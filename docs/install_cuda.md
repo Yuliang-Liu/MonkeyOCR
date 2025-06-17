@@ -1,0 +1,139 @@
+# Install with CUDA Support
+
+This guide walks you through setting up the environment for **MonkeyOCR** with CUDA support. You can choose **one** of the backends — **LMDeploy**, **vLLM**, or **transformers** — to install and use. It covers installation instructions for each of them.
+
+> **Note:** Based on our internal test, inference speed ranking is: **LMDeploy ≥ vLLM >>> transformers**
+
+## Using **LMDeploy** as the Inference Backend (Optional)
+> **Supporting CUDA 12.4/12.1/11.8**
+
+If you're using **CUDA 12.4**, follow these steps:
+
+```bash
+conda create -n MonkeyOCR python=3.10
+conda activate MonkeyOCR
+
+git clone https://github.com/Yuliang-Liu/MonkeyOCR.git
+cd MonkeyOCR
+
+# Install PyTorch. Refer to https://pytorch.org/get-started/previous-versions/ for version compatibility
+pip install torch==2.5.1 torchvision==0.20.1 torchaudio==2.5.1 --index-url https://download.pytorch.org/whl/cu124
+
+pip install -e .
+
+pip install lmdeploy==0.8.0
+```
+
+If you're using **CUDA 11.8** or **CUDA 12.1**, use the following instead:
+
+```bash
+conda create -n MonkeyOCR python=3.10
+conda activate MonkeyOCR
+
+git clone https://github.com/Yuliang-Liu/MonkeyOCR.git
+cd MonkeyOCR
+
+export CUDA_VERSION=118 # for CUDA 11.8
+# or export CUDA_VERSION=121 for CUDA 12.1
+
+# Install PyTorch. Refer to https://pytorch.org/get-started/previous-versions/ for version compatibility
+pip install torch==2.5.1 torchvision==0.20.1 torchaudio==2.5.1 --index-url https://download.pytorch.org/whl/cu${CUDA_VERSION}
+
+pip install -e .
+
+pip install https://github.com/InternLM/lmdeploy/releases/download/v0.8.0/lmdeploy-0.8.0+cu${CUDA_VERSION}-cp310-cp310-manylinux2014_x86_64.whl --extra-index-url https://download.pytorch.org/whl/cu${CUDA_VERSION}
+```
+
+### Fixing the **Shared Memory Error** on **RTX 3090 / 4090 / ...** GPUs (Optional)
+
+Our 3B model runs smoothly on the NVIDIA RTX 3090. However, when using **LMDeploy** as the inference backend, you might run into compatibility issues on **RTX 3090 / 4090** GPUs — typically this error:
+
+```
+triton.runtime.errors.OutOfResources: out of resource: shared memory
+```
+
+To resolve this issue, apply the following patch:
+
+```bash
+python tools/lmdeploy_patcher.py patch
+```
+
+> ⚠️ **Note:** This command modifies LMDeploy’s source code in your environment.
+> To undo the changes, simply run:
+
+```bash
+python tools/lmdeploy_patcher.py restore
+```
+
+Based on our tests on the **NVIDIA RTX 3090**, inference speed was **0.338 pages/second** using **LMDeploy** (with the patch applied), compared to only **0.015 pages/second** using **transformers**.
+
+**Special thanks to [@pineking](https://github.com/pineking) for the solution!**
+
+---
+
+## Using **vLLM** as the Inference Backend (Optional)
+> **Supporting CUDA 12.6/11.8/12.8**
+```bash
+conda create -n MonkeyOCR python=3.10
+conda activate MonkeyOCR
+
+git clone https://github.com/Yuliang-Liu/MonkeyOCR.git
+cd MonkeyOCR
+
+pip install -e .
+pip install uv
+```
+
+Install **vLLM** based on your CUDA version:
+
+```bash
+# CUDA 11.8
+uv pip install vllm==0.9.1 --torch-backend=118
+# CUDA 12.6
+uv pip install vllm==0.9.1 --torch-backend=126
+# CUDA 12.8
+uv pip install vllm==0.9.1 --torch-backend=128
+```
+
+Then, update the `chat_config.backend` field in your `model_configs.yaml` config file:
+
+```yaml
+chat_config:
+    backend: vllm
+```
+
+---
+
+### Using **transformers** as the Inference Backend (Optional)
+> **Supporting CUDA 12.4/12.1/11.8**
+```bash
+conda create -n MonkeyOCR python=3.10
+conda activate MonkeyOCR
+
+git clone https://github.com/Yuliang-Liu/MonkeyOCR.git
+cd MonkeyOCR
+
+pip install -e .
+```
+
+Install PyTorch according to your CUDA version:
+
+```bash
+export CUDA_VERSION=124 # for CUDA 12.4
+# or export CUDA_VERSION=118 for CUDA 11.8
+# or export CUDA_VERSION=121 for CUDA 12.1
+
+# Install pytorch
+pip install torch==2.5.1 torchvision==0.20.1 torchaudio==2.5.1 --index-url https://download.pytorch.org/whl/cu${CUDA_VERSION}
+
+Install Flash Attention 2:
+
+```bash
+pip install flash-attn==2.7.4.post1 --no-build-isolation
+```
+Then, update the `chat_config` in your `model_configs.yaml` config file:
+```yaml
+chat_config:
+  backend: transformers
+  batch_size: 10  # Adjust based on your available GPU memory
+```

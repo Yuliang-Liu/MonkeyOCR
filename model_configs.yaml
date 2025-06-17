@@ -1,4 +1,4 @@
-device: cuda
+device: cuda # cuda or cpu
 weights:
   doclayout_yolo: Structure/doclayout_yolo_docstructbench_imgsz1280_2501.pt
   layoutreader: Relation
@@ -9,5 +9,5 @@ layout_config:
     name: layoutreader
 chat_config:
   weight_path: model_weight/Recognition
-  backend: lmdeploy # lmdeploy or transformers
+  backend: lmdeploy # lmdeploy or vllm or transformers
   batch_size: 10 # active when using `transformers` as backend

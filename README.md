@@ -42,17 +42,7 @@ Currently, our model is deployed on a single GPU, so if too many users upload fi
 # Quick Start
 ## Locally Install
 ### 1. Install MonkeyOCR
-```bash
-conda create -n MonkeyOCR python=3.10
-conda activate MonkeyOCR
-
-git clone https://github.com/Yuliang-Liu/MonkeyOCR.git
-cd MonkeyOCR
-
-# Install pytorch, see https://pytorch.org/get-started/previous-versions/ for your cuda version
-pip install torch==2.5.1 torchvision==0.20.1 torchaudio==2.5.1 --index-url https://download.pytorch.org/whl/cu124 
-pip install -e .
-```
+See the [installation guide](https://github.com/Yuliang-Liu/MonkeyOCR/blob/main/docs/install_cuda.md) to set up your environment.
 ### 2. Download Model Weights
 Download our model from Huggingface.
 ```python
@@ -121,51 +111,6 @@ pip install pdf2image==1.17.0
 ```bash
 # Start demo
 python demo/demo_gradio.py
-```
-### Fix **shared memory error** on **RTX 3090 / 4090 / ...** GPUs (Optional)
-
-Our 3B model runs efficiently on NVIDIA RTX 3090. However, when using **LMDeploy** as the inference backend, you may encounter compatibility issues on **RTX 3090 / 4090** GPUs — particularly the following error:
-
-```
-triton.runtime.errors.OutOfResources: out of resource: shared memory
-```
-
-To work around this issue, you can apply the patch below:
-
-```bash
-python tools/lmdeploy_patcher.py patch
-```
-
-> ⚠️ **Note:** This command will modify LMDeploy's source code in your environment.
-> To revert the changes, simply run:
-
-```bash
-python tools/lmdeploy_patcher.py restore
-```
-
-After our tests on **NVIDIA RTX 3090**, the inference speed was **0.338** pages per second when using **lmdeploy** as the inference backend after applying lmdeploy_patcher, while it was **0.015** pages per second when using **transformers** as the inference backend.
-
-**Special thanks to [@pineking](https://github.com/pineking) for the solution!**
-
-### Switch inference backend (Optional)
-
-You can switch inference backend to `transformers` following the steps below:
-
-1. Install required dependency (if not already installed):
-   ```bash
-   # install flash attention 2, you can download the corresponding version from https://github.com/Dao-AILab/flash-attention/releases/
-   pip install flash-attn==2.7.4.post1 --no-build-isolation
-   ```
-2. Open the `model_configs.yaml` file
-3. Set `chat_config.backend` to `transformers`
-4. Adjust the `batch_size` according to your GPU's memory capacity to ensure stable performance
-
-Example configuration:
-
-```yaml
-chat_config:
-  backend: transformers
-  batch_size: 10  # Adjust based on your available GPU memory
 ```
 
 ## Docker Deployment
