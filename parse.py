@@ -5,7 +5,7 @@ import time
 import argparse
 import sys
 from pathlib import Path
-import uuid
+import torch.distributed as dist
 from pdf2image import convert_from_path
 
 from magic_pdf.data.data_reader_writer import FileBasedDataWriter, FileBasedDataReader
@@ -339,9 +339,13 @@ Usage examples:
                 print(f"\n✅ Parsing completed! Results saved in: {result_dir}")
         else:
             raise FileNotFoundError(f"Input path does not exist: {args.input_path}")
+        if dist.is_initialized():
+            dist.destroy_process_group()
         
     except Exception as e:
         print(f"\n❌ Processing failed: {str(e)}", file=sys.stderr)
+        if dist.is_initialized():
+            dist.destroy_process_group()
         sys.exit(1)
 
 

@@ -104,11 +104,6 @@ These files provide both the final formatted output and detailed intermediate re
 
 ### 4. Gradio Demo
 ```bash
-# Prepare your env for gradio
-pip install gradio==5.23.3
-pip install pdf2image==1.17.0
-```
-```bash
 # Start demo
 python demo/demo_gradio.py
 ```

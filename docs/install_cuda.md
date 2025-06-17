@@ -34,7 +34,7 @@ git clone https://github.com/Yuliang-Liu/MonkeyOCR.git
 cd MonkeyOCR
 
 export CUDA_VERSION=118 # for CUDA 11.8
-# or export CUDA_VERSION=121 for CUDA 12.1
+# export CUDA_VERSION=121 # for CUDA 12.1
 
 # Install PyTorch. Refer to https://pytorch.org/get-started/previous-versions/ for version compatibility
 pip install torch==2.5.1 torchvision==0.20.1 torchaudio==2.5.1 --index-url https://download.pytorch.org/whl/cu${CUDA_VERSION}
@@ -72,7 +72,7 @@ Based on our tests on the **NVIDIA RTX 3090**, inference speed was **0.338 pages
 ---
 
 ## Using **vLLM** as the Inference Backend (Optional)
-> **Supporting CUDA 12.6/11.8/12.8**
+> **Supporting CUDA 12.6/12.8/11.8**
 ```bash
 conda create -n MonkeyOCR python=3.10
 conda activate MonkeyOCR
@@ -80,19 +80,13 @@ conda activate MonkeyOCR
 git clone https://github.com/Yuliang-Liu/MonkeyOCR.git
 cd MonkeyOCR
 
+pip install uv --upgrade
+export CUDA_VERSION=126 # for CUDA 12.6
+# export CUDA_VERSION=128 # for CUDA 12.8
+# export CUDA_VERSION=118 # for CUDA 11.8
+uv pip install vllm==0.9.1 --torch-backend=cu${CUDA_VERSION}
+
 pip install -e .
-pip install uv
-```
-
-Install **vLLM** based on your CUDA version:
-
-```bash
-# CUDA 11.8
-uv pip install vllm==0.9.1 --torch-backend=118
-# CUDA 12.6
-uv pip install vllm==0.9.1 --torch-backend=126
-# CUDA 12.8
-uv pip install vllm==0.9.1 --torch-backend=128
 ```
 
 Then, update the `chat_config.backend` field in your `model_configs.yaml` config file:
@@ -105,7 +99,7 @@ chat_config:
 ---
 
 ### Using **transformers** as the Inference Backend (Optional)
-> **Supporting CUDA 12.4/12.1/11.8**
+> **Supporting CUDA 12.4/12.1**
 ```bash
 conda create -n MonkeyOCR python=3.10
 conda activate MonkeyOCR
@@ -120,8 +114,7 @@ Install PyTorch according to your CUDA version:
 
 ```bash
 export CUDA_VERSION=124 # for CUDA 12.4
-# or export CUDA_VERSION=118 for CUDA 11.8
-# or export CUDA_VERSION=121 for CUDA 12.1
+# export CUDA_VERSION=121 # for CUDA 12.1
 
 # Install pytorch
 pip install torch==2.5.1 torchvision==0.20.1 torchaudio==2.5.1 --index-url https://download.pytorch.org/whl/cu${CUDA_VERSION}

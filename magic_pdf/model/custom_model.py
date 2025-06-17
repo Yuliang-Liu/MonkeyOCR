@@ -90,6 +90,9 @@ class MonkeyOCR:
         if chat_backend == 'lmdeploy':
             logger.info('Use LMDeploy as backend')
             self.chat_model = MonkeyChat_LMDeploy(chat_path)
+        elif chat_backend == 'vllm':
+            logger.info('Use vLLM as backend')
+            self.chat_model = MonkeyChat_vLLM(chat_path)
         elif chat_backend == 'transformers':
             logger.info('Use transformers as backend')
             batch_size = self.chat_config.get('batch_size', 5)
@@ -104,8 +107,8 @@ class MonkeyChat_LMDeploy:
         try:
             from lmdeploy import pipeline, GenerationConfig, PytorchEngineConfig, ChatTemplateConfig
         except ImportError:
-            raise ImportError("LMDeploy is not installed. Please install it following:\n"
-                              "https://github.com/Yuliang-Liu/MonkeyOCR/blob/main/docs/install_cuda.md\n"
+            raise ImportError("LMDeploy is not installed. Please install it following: "
+                              "https://github.com/Yuliang-Liu/MonkeyOCR/blob/main/docs/install_cuda.md "
                               "to use MonkeyChat_LMDeploy.")
         self.model_name = os.path.basename(model_path)
         self.engine_config = self._auto_config_dtype(engine_config, PytorchEngineConfig)
@@ -138,12 +141,20 @@ class MonkeyChat_vLLM:
         try:
             from vllm import LLM, SamplingParams
         except ImportError:
-            raise ImportError("vLLM is not installed. Please install it following:\n"
-                              "https://github.com/Yuliang-Liu/MonkeyOCR/blob/main/docs/install_cuda.md\n"
+            raise ImportError("vLLM is not installed. Please install it following: "
+                              "https://github.com/Yuliang-Liu/MonkeyOCR/blob/main/docs/install_cuda.md "
                                "to use MonkeyChat_vLLM.")
         self.model_name = os.path.basename(model_path)
-        self.pipe = LLM(model=model_path, max_seq_len_to_capture=10240, mm_processor_kwargs={'use_fast': True})
+        self.pipe = LLM(model=model_path,
+                        max_seq_len_to_capture=10240,
+                        mm_processor_kwargs={'use_fast': True},
+                        gpu_memory_utilization=self._auto_gpu_mem_ratio(0.9))
         self.gen_config = SamplingParams(max_tokens=4096,temperature=0,repetition_penalty=1.05)
+    
+    def _auto_gpu_mem_ratio(self, ratio):
+        mem_free, mem_total = torch.cuda.mem_get_info()
+        ratio = ratio * mem_free / mem_total
+        return ratio
 
     def batch_inference(self, images, questions):
         placeholder = "<|image_pad|>"
@@ -167,8 +178,8 @@ class MonkeyChat_transformers:
         try:
             from transformers import Qwen2_5_VLForConditionalGeneration, AutoProcessor
         except ImportError:
-            raise ImportError("transformers is not installed. Please install it following:\n"
-                              "https://github.com/Yuliang-Liu/MonkeyOCR/blob/main/docs/install_cuda.md\n"
+            raise ImportError("transformers is not installed. Please install it following: "
+                              "https://github.com/Yuliang-Liu/MonkeyOCR/blob/main/docs/install_cuda.md "
                               "to use MonkeyChat_transformers.")
         self.model_name = os.path.basename(model_path)
         self.max_batch_size = max_batch_size
