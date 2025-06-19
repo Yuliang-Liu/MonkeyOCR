@@ -186,6 +186,19 @@ def single_task_recognition(input_file, output_dir, MonkeyOCR_model, task):
         print(f"Processed {len(images)} image(s)")
         print(f"Result saved to: {os.path.join(local_md_dir, result_filename)}")
         
+        # Clean up resources
+        try:
+            # Give some time for async tasks to complete
+            time.sleep(0.5)
+            
+            # Close images if they were opened
+            for img in images:
+                if hasattr(img, 'close'):
+                    img.close()
+                    
+        except Exception as cleanup_error:
+            print(f"Warning: Error during cleanup: {cleanup_error}")
+        
         return local_md_dir
         
     except Exception as e:
@@ -302,6 +315,8 @@ Usage examples:
     
     args = parser.parse_args()
     
+    MonkeyOCR_model = None
+    
     try:
         # Check if input path is a directory or file
         if os.path.isdir(args.input_path):
@@ -339,14 +354,26 @@ Usage examples:
                 print(f"\n✅ Parsing completed! Results saved in: {result_dir}")
         else:
             raise FileNotFoundError(f"Input path does not exist: {args.input_path}")
-        if dist.is_initialized():
-            dist.destroy_process_group()
-        
+            
     except Exception as e:
         print(f"\n❌ Processing failed: {str(e)}", file=sys.stderr)
-        if dist.is_initialized():
-            dist.destroy_process_group()
         sys.exit(1)
+    finally:
+        # Clean up resources
+        try:
+            if MonkeyOCR_model is not None:
+                # Clean up model resources if needed
+                if hasattr(MonkeyOCR_model, 'chat_model') and hasattr(MonkeyOCR_model.chat_model, 'close'):
+                    MonkeyOCR_model.chat_model.close()
+                    
+            # Give time for async tasks to complete before exiting
+            time.sleep(1.0)
+            
+            if dist.is_initialized():
+                dist.destroy_process_group()
+                
+        except Exception as cleanup_error:
+            print(f"Warning: Error during final cleanup: {cleanup_error}")
 
 
 if __name__ == "__main__":
