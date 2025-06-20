@@ -7,7 +7,7 @@ This guide walks you through setting up the environment for **MonkeyOCR** with C
 ## Using **LMDeploy** as the Inference Backend (Optional)
 > **Supporting CUDA 12.4/12.1/11.8**
 
-If you're using **CUDA 12.4**, follow these steps:
+If you're using **CUDA 12.4** or **CUDA 12.1**, follow these steps:
 
 ```bash
 conda create -n MonkeyOCR python=3.10
@@ -16,24 +16,7 @@ conda activate MonkeyOCR
 git clone https://github.com/Yuliang-Liu/MonkeyOCR.git
 cd MonkeyOCR
 
-# Install PyTorch. Refer to https://pytorch.org/get-started/previous-versions/ for version compatibility
-pip install torch==2.5.1 torchvision==0.20.1 torchaudio==2.5.1 --index-url https://download.pytorch.org/whl/cu124
-
-pip install -e .
-
-pip install lmdeploy==0.8.0
-```
-
-If you're using **CUDA 11.8** or **CUDA 12.1**, use the following instead:
-
-```bash
-conda create -n MonkeyOCR python=3.10
-conda activate MonkeyOCR
-
-git clone https://github.com/Yuliang-Liu/MonkeyOCR.git
-cd MonkeyOCR
-
-export CUDA_VERSION=118 # for CUDA 11.8
+export CUDA_VERSION=124 # for CUDA 12.4
 # export CUDA_VERSION=121 # for CUDA 12.1
 
 # Install PyTorch. Refer to https://pytorch.org/get-started/previous-versions/ for version compatibility
@@ -41,7 +24,24 @@ pip install torch==2.5.1 torchvision==0.20.1 torchaudio==2.5.1 --index-url https
 
 pip install -e .
 
-pip install https://github.com/InternLM/lmdeploy/releases/download/v0.8.0/lmdeploy-0.8.0+cu${CUDA_VERSION}-cp310-cp310-manylinux2014_x86_64.whl --extra-index-url https://download.pytorch.org/whl/cu${CUDA_VERSION}
+pip install lmdeploy==0.8.0
+```
+
+If you're using **CUDA 11.8**, use the following instead:
+
+```bash
+conda create -n MonkeyOCR python=3.10
+conda activate MonkeyOCR
+
+git clone https://github.com/Yuliang-Liu/MonkeyOCR.git
+cd MonkeyOCR
+
+# Install PyTorch. Refer to https://pytorch.org/get-started/previous-versions/ for version compatibility
+pip install torch==2.5.1 torchvision==0.20.1 torchaudio==2.5.1 --index-url https://download.pytorch.org/whl/cu118
+
+pip install -e .
+
+pip install https://github.com/InternLM/lmdeploy/releases/download/v0.8.0/lmdeploy-0.8.0+cu118-cp310-cp310-manylinux2014_x86_64.whl --extra-index-url https://download.pytorch.org/whl/cu118
 ```
 
 ### Fixing the **Shared Memory Error** on **RTX 3090 / 4090 / ...** GPUs (Optional)
