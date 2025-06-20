@@ -17,3 +17,4 @@ PyYAML
 dill>=0.3.8,<1
 gradio==5.23.3
 pdf2image==1.17.0
+openai==1.88.0

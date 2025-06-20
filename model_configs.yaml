@@ -9,5 +9,11 @@ layout_config:
     name: layoutreader
 chat_config:
   weight_path: model_weight/Recognition
-  backend: lmdeploy # lmdeploy or vllm or transformers
+  backend: lmdeploy # lmdeploy or vllm or transformers or api
   batch_size: 10 # active when using `transformers` as backend
+
+# Uncomment the following lines if use `api` as backend 
+# api_config:
+#   url: https://api.openai.com/v1
+#   model_name: gpt-4.1
+#   api_key: sk-xxx

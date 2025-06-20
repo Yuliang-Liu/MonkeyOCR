@@ -10,6 +10,7 @@ from qwen_vl_utils import process_vision_info
 from PIL import Image
 import requests
 from typing import List, Union
+from openai import OpenAI
 
 
 class MonkeyOCR:
@@ -97,6 +98,16 @@ class MonkeyOCR:
             logger.info('Use transformers as backend')
             batch_size = self.chat_config.get('batch_size', 5)
             self.chat_model = MonkeyChat_transformers(chat_path, batch_size, device=self.device)
+        elif chat_backend == 'api':
+            logger.info('Use API as backend')
+            api_config = self.configs.get('api_config', {})
+            if not api_config:
+                raise ValueError("API configuration is required for API backend.")
+            self.chat_model = MonkeyChat_OpenAIAPI(
+                url=api_config.get('url'),
+                model_name=api_config.get('model_name'),
+                api_key=api_config.get('api_key', None)
+            )
         else:
             logger.warning('Use LMDeploy as default backend')
             self.chat_model = MonkeyChat_LMDeploy(chat_path)
@@ -373,3 +384,65 @@ class MonkeyChat_transformers:
     
     def single_inference(self, image: Union[str, Image.Image], question: str) -> str:
         return self._process_single(image, question)
+    
+class MonkeyChat_OpenAIAPI:
+    def __init__(self, url: str, model_name: str, api_key: str = None):
+        self.model_name = model_name
+        self.client = OpenAI(
+            api_key=api_key,
+            base_url=url
+        )
+
+    def img2base64(self, image: Image.Image):
+        """
+        Convert a PIL Image to a Base64 encoded string.
+        """
+        import io
+        import base64
+
+        buffered = io.BytesIO()
+
+        try:
+            if hasattr(image, 'format') and image.format:
+                img_format = image.format
+            else:
+                # Default to PNG if format is not specified
+                img_format = "PNG"
+
+            image.save(buffered, format=img_format)
+            img_base64 = base64.b64encode(buffered.getvalue()).decode('utf-8')
+            return img_base64, img_format.lower
+        
+        except Exception as e:
+            raise ValueError(f"Failed to convert image to base64: {e}")
+        
+    def batch_inference(self, images: List[Union[str, Image.Image]], questions: List[str]) -> List[str]:
+        results = []
+        for image, question in zip(images, questions):
+            try:
+                if isinstance(image, Image.Image):
+                    img, img_type = self.img2base64(image)
+                else:
+                    img, img_type = image, 'png'
+
+                messages=[{
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "input_image",
+                            "image_url": f"data:image/{img_type};base64,{img}"
+                        },
+                        {
+                            "type": "input_text", 
+                            "text": question
+                        }
+                    ],
+                }]
+                response = self.client.chat.completions.create(
+                    model=self.model_name,
+                    messages=messages
+                )
+                results.append(response.choices[0].message.content)
+            except Exception as e:
+                results.append(f"Error: {e}")
+        return results
