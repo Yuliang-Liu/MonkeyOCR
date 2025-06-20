@@ -411,7 +411,7 @@ class MonkeyChat_OpenAIAPI:
 
             image.save(buffered, format=img_format)
             img_base64 = base64.b64encode(buffered.getvalue()).decode('utf-8')
-            return img_base64, img_format.lower
+            return img_base64, img_format.lower()
         
         except Exception as e:
             raise ValueError(f"Failed to convert image to base64: {e}")
