@@ -24,10 +24,18 @@ class MonkeyOCR:
         with open(config_path, 'r', encoding='utf-8') as f:
             self.configs = yaml.load(f, Loader=yaml.FullLoader)
         logger.info('using configs: {}'.format(self.configs))
+
         self.device = self.configs.get('device', 'cpu')
         logger.info('using device: {}'.format(self.device))
+
+        bf_16_support = False
+        if self.device.startswith("cuda"):
+            bf_16_support = torch.cuda.is_bf16_supported()
+        elif self.device.startswith("mps"):
+            bf_16_support = True
+        
         models_dir = self.configs.get(
-            'models_dir', os.path.join(root_dir, 'resources', 'models')
+            'models_dir', os.path.join(root_dir, 'model_weight')
         )
 
         logger.info('using models_dir: {}'.format(models_dir))
@@ -77,9 +85,10 @@ class MonkeyOCR:
                     'hantian/layoutreader'
                 )
 
-            if self.device == 'cuda' and torch.cuda.is_bf16_supported():
-                model.bfloat16()
-            model.to(self.device).eval()
+            if bf_16_support:
+                model.to(self.device).eval().bfloat16()
+            else:
+                model.to(self.device).eval()
         else:
             logger.error('model name not allow')
         self.layoutreader_model = model
@@ -392,6 +401,21 @@ class MonkeyChat_OpenAIAPI:
             api_key=api_key,
             base_url=url
         )
+        if not self.validate_connection():
+            raise ValueError("Invalid API URL or API key. Please check your configuration.")
+
+    def validate_connection(self) -> bool:
+        """
+        Validate the effectiveness of API URL and key
+        """
+        try:
+            # Try to get model list to validate connection
+            response = self.client.models.list()
+            logger.info("API connection validation successful")
+            return True
+        except Exception as e:
+            logger.error(f"API connection validation failed: {e}")
+            return False
 
     def img2base64(self, image: Image.Image):
         """

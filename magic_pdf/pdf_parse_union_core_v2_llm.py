@@ -15,19 +15,11 @@ from magic_pdf.config.ocr_content_type import BlockType, ContentType
 from magic_pdf.data.dataset import Dataset, PageableData
 from magic_pdf.libs.boxbase import calculate_overlap_area_in_bbox1_area_ratio, __is_overlaps_y_exceeds_threshold
 from magic_pdf.libs.clean_memory import clean_memory
-from magic_pdf.libs.config_reader import get_local_layoutreader_model_dir, get_device
 from magic_pdf.libs.convert_utils import dict_to_list
 from magic_pdf.libs.hash_utils import compute_md5
 from magic_pdf.libs.pdf_image_tools import cut_image_to_pil_image
 from magic_pdf.model.magic_model import MagicModel
 
-try:
-    import torchtext
-
-    if torchtext.__version__ >= '0.18.0':
-        torchtext.disable_torchtext_deprecation_warning()
-except ImportError:
-    pass
 
 from magic_pdf.model.sub_modules.model_init import AtomModelSingleton
 from magic_pdf.post_proc.para_split_v3 import para_split
@@ -37,8 +29,6 @@ from magic_pdf.pre_proc.ocr_detect_all_bboxes import ocr_prepare_bboxes_for_layo
 from magic_pdf.pre_proc.ocr_dict_merge import fill_spans_in_blocks, fix_block_spans_v2, fix_discarded_block
 from magic_pdf.pre_proc.ocr_span_list_modify import get_qa_need_list_v2, remove_overlaps_low_confidence_spans, \
     remove_overlaps_min_spans, check_chars_is_overlap_in_span
-
-os.environ['NO_ALBUMENTATIONS_UPDATE'] = '1'  # Disable albumentations update check
 
 
 def __replace_STX_ETX(text_str: str):

@@ -5,8 +5,6 @@ from loguru import logger
 
 from magic_pdf.model.batch_analyze_llm import BatchAnalyzeLLM
 
-os.environ['NO_ALBUMENTATIONS_UPDATE'] = '1'
-
 from magic_pdf.data.dataset import Dataset
 from magic_pdf.libs.clean_memory import clean_memory
 from magic_pdf.operators.models_llm import InferenceResultLLM
