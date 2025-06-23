@@ -16,8 +16,9 @@ from fastapi import FastAPI, UploadFile, File, HTTPException, Form
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
+from tempfile import gettempdir
 import zipfile
-import shutil
+from loguru import logger
 import time
 
 from magic_pdf.model.custom_model import MonkeyOCR
@@ -39,9 +40,10 @@ class ParseResponse(BaseModel):
     files: Optional[List[str]] = None
     download_url: Optional[str] = None
 
-# Global model instance
+# Global model instance and lock
 monkey_ocr_model = None
-executor = ThreadPoolExecutor(max_workers=2)
+model_lock = asyncio.Lock()
+executor = ThreadPoolExecutor(max_workers=4)
 
 def initialize_model():
     """Initialize MonkeyOCR model"""
@@ -57,9 +59,9 @@ async def lifespan(app: FastAPI):
     # Startup
     try:
         initialize_model()
-        print("✅ MonkeyOCR model initialized successfully")
+        logger.info("✅ MonkeyOCR model initialized successfully")
     except Exception as e:
-        print(f"❌ Failed to initialize MonkeyOCR model: {e}")
+        logger.info(f"❌ Failed to initialize MonkeyOCR model: {e}")
         raise
     
     yield
@@ -67,7 +69,7 @@ async def lifespan(app: FastAPI):
     # Shutdown
     global executor
     executor.shutdown(wait=True)
-    print("🔄 Application shutdown complete")
+    logger.info("🔄 Application shutdown complete")
 
 app = FastAPI(
     title="MonkeyOCR API",
@@ -76,7 +78,8 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-temp_dir = "/app/tmp"
+temp_dir = os.getenv("TMPDIR", gettempdir())
+logger.info(f"Using temporary directory: {temp_dir}")
 os.makedirs(temp_dir, exist_ok=True)
 app.mount("/static", StaticFiles(directory=temp_dir), name="static")
 
@@ -129,15 +132,14 @@ async def parse_document(file: UploadFile = File(...)):
             # Create output directory
             output_dir = tempfile.mkdtemp(prefix="monkeyocr_parse_")
             
-            # Run parsing in thread pool
-            loop = asyncio.get_event_loop()
-            result_dir = await loop.run_in_executor(
-                executor, 
-                parse_pdf, 
-                temp_file_path, 
-                output_dir, 
-                monkey_ocr_model
-            )
+            # Define a function that uses the model (this will be locked)
+            def run_parse_with_model():
+                return parse_pdf(temp_file_path, output_dir, monkey_ocr_model)
+            
+            # Only lock during model inference
+            async with model_lock:
+                loop = asyncio.get_event_loop()
+                result_dir = await loop.run_in_executor(executor, run_parse_with_model)
             
             # List generated files
             files = []
@@ -149,7 +151,7 @@ async def parse_document(file: UploadFile = File(...)):
             
             # Create download URL with original filename
             zip_filename = f"{original_name}_parsed_{int(time.time())}.zip"
-            zip_path = os.path.join("/app/tmp", zip_filename)
+            zip_path = os.path.join(temp_dir, zip_filename)
             
             # Create ZIP file with renamed files
             with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
@@ -206,7 +208,7 @@ async def parse_document(file: UploadFile = File(...)):
 @app.get("/download/{filename}")
 async def download_file(filename: str):
     """Download result files"""
-    file_path = os.path.join("/app/tmp", filename)
+    file_path = os.path.join(temp_dir, filename)
     
     if not os.path.exists(file_path):
         raise HTTPException(status_code=404, detail="File not found")
@@ -220,8 +222,8 @@ async def download_file(filename: str):
 @app.get("/results/{task_id}")
 async def get_results(task_id: str):
     """Get parsing results by task ID"""
-    result_dir = f"/app/tmp/monkeyocr_parse_{task_id}"
-    
+    result_dir = os.path.join(temp_dir, f"monkeyocr_parse_{task_id}")
+
     if not os.path.exists(result_dir):
         raise HTTPException(status_code=404, detail="Results not found")
     
@@ -258,18 +260,21 @@ async def perform_ocr_task(file: UploadFile, task_type: str) -> TaskResponse:
             # Create output directory
             output_dir = tempfile.mkdtemp(prefix=f"monkeyocr_{task_type}_")
             
-            # Run OCR task in thread pool
-            loop = asyncio.get_event_loop()
-            result_dir = await loop.run_in_executor(
-                executor,
-                single_task_recognition,
-                temp_file_path,
-                output_dir,
-                monkey_ocr_model,
-                task_type
-            )
+            # Define a function that uses the model (this will be locked)
+            def run_ocr_with_model():
+                return single_task_recognition(
+                    temp_file_path,
+                    output_dir,
+                    monkey_ocr_model,
+                    task_type
+                )
             
-            # Read result file
+            # Only lock during model inference
+            async with model_lock:
+                loop = asyncio.get_event_loop()
+                result_dir = await loop.run_in_executor(executor, run_ocr_with_model)
+            
+            # Read result file (can be done in parallel after model finishes)
             result_files = [f for f in os.listdir(result_dir) if f.endswith(f'_{task_type}_result.md')]
             if not result_files:
                 raise Exception("No result file generated")
