@@ -28,11 +28,11 @@ class MonkeyOCR:
         self.device = self.configs.get('device', 'cpu')
         logger.info('using device: {}'.format(self.device))
 
-        bf_16_support = False
+        bf16_supported = False
         if self.device.startswith("cuda"):
-            bf_16_support = torch.cuda.is_bf16_supported()
+            bf16_supported = torch.cuda.is_bf16_supported()
         elif self.device.startswith("mps"):
-            bf_16_support = True
+            bf16_supported = True
         
         models_dir = self.configs.get(
             'models_dir', os.path.join(root_dir, 'model_weight')
@@ -85,7 +85,7 @@ class MonkeyOCR:
                     'hantian/layoutreader'
                 )
 
-            if bf_16_support:
+            if bf16_supported:
                 model.to(self.device).eval().bfloat16()
             else:
                 model.to(self.device).eval()
@@ -209,6 +209,12 @@ class MonkeyChat_transformers:
             self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
         else:
             self.device = device
+        
+        bf16_supported = False
+        if self.device.startswith("cuda"):
+            bf16_supported = torch.cuda.is_bf16_supported()
+        elif self.device.startswith("mps"):
+            bf16_supported = True
             
         logger.info(f"Loading Qwen2.5VL model from: {model_path}")
         logger.info(f"Using device: {self.device}")
@@ -217,8 +223,8 @@ class MonkeyChat_transformers:
         try:
             self.model = Qwen2_5_VLForConditionalGeneration.from_pretrained(
                         model_path,
-                        torch_dtype=torch.bfloat16,
-                        attn_implementation="flash_attention_2" if self.device != 'cpu' else 'sdpa',
+                        torch_dtype=bf16_supported,
+                        attn_implementation="flash_attention_2" if self.device.startswith("cuda") else 'sdpa',
                         device_map=self.device,
                     )
                 
