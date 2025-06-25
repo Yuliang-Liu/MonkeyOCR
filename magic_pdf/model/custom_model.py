@@ -410,18 +410,23 @@ class MonkeyChat_OpenAIAPI:
         except Exception as e:
             logger.error(f"API connection validation failed: {e}")
             return False
-        
+    
+    def img2base64(self, image: Union[str, Image.Image]) -> tuple[str, str]:
+        if hasattr(image, 'format') and image.format:
+            img_format = image.format
+        else:
+            # Default to PNG if format is not specified
+            img_format = "PNG"
+        image = encode_image_base64(image)
+        return image, img_format.lower()
+
     def batch_inference(self, images: List[Union[str, Image.Image]], questions: List[str]) -> List[str]:
         results = []
         for image, question in zip(images, questions):
             try:
                 # Load and resize image
                 image = load_image(image, max_size=1600)
-
-                if isinstance(image, Image.Image):
-                    img, img_type = encode_image_base64(image)
-                else:
-                    img, img_type = image, 'png'
+                img, img_type = self.img2base64(image)
 
                 messages=[{
                     "role": "user",
