@@ -11,7 +11,7 @@ from loguru import logger
 
 
 def encode_image_base64(image: Union[str, Image.Image]) -> str:
-    """encode raw date to base64 format."""
+    """encode raw data to base64 format."""
     buffered = BytesIO()
     FETCH_TIMEOUT = int(os.environ.get('LMDEPLOY_FETCH_TIMEOUT', 10))
     headers = {
