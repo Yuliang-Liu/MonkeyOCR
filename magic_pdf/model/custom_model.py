@@ -3,6 +3,7 @@ import torch
 from magic_pdf.config.constants import *
 from magic_pdf.model.sub_modules.model_init import AtomModelSingleton
 from magic_pdf.model.model_list import AtomicModel
+from magic_pdf.utils.load_image import load_image, encode_image_base64
 from transformers import LayoutLMv3ForTokenClassification
 from loguru import logger
 import yaml
@@ -151,8 +152,7 @@ class MonkeyChat_LMDeploy:
         return engine_config
     
     def batch_inference(self, images, questions):
-        from lmdeploy.vl import load_image
-        inputs = [(question, load_image(image)) for image, question in zip(images, questions)]
+        inputs = [(question, load_image(image, max_size=1600)) for image, question in zip(images, questions)]
         outputs = self.pipe(inputs, gen_config=self.gen_config)
         return [output.text for output in outputs]
     
@@ -187,7 +187,7 @@ class MonkeyChat_vLLM:
         inputs = [{
             "prompt": prompts[i],
             "multi_modal_data": {
-                "image": images[i],
+                "image": load_image(images[i], max_size=1600),
             }
         } for i in range(len(prompts))]
         outputs = self.pipe.generate(inputs, sampling_params=self.gen_config)
@@ -241,18 +241,6 @@ class MonkeyChat_transformers:
             logger.error(f"Failed to load model: {e}")
             raise e
     
-    def load_image(self, image_source: Union[str, Image.Image]) -> Image.Image:
-        if isinstance(image_source, str):
-            if image_source.startswith('http'):
-                response = requests.get(image_source)
-                return Image.open(response.content).convert('RGB')
-            else:
-                return Image.open(image_source).convert('RGB')
-        elif isinstance(image_source, Image.Image):
-            return image_source.convert('RGB')
-        else:
-            raise ValueError(f"Unsupported image type: {type(image_source)}")
-    
     def prepare_messages(self, images: List[Union[str, Image.Image]], questions: List[str]) -> List[List[dict]]:
         if len(images) != len(questions):
             raise ValueError("Images and questions must have the same length")
@@ -265,7 +253,7 @@ class MonkeyChat_transformers:
                     "content": [
                         {
                             "type": "image",
-                            "image": image if isinstance(image, str) else image,
+                            "image": load_image(image, max_size=1600),
                         },
                         {"type": "text", "text": question},
                     ],
@@ -422,36 +410,16 @@ class MonkeyChat_OpenAIAPI:
         except Exception as e:
             logger.error(f"API connection validation failed: {e}")
             return False
-
-    def img2base64(self, image: Image.Image):
-        """
-        Convert a PIL Image to a Base64 encoded string.
-        """
-        import io
-        import base64
-
-        buffered = io.BytesIO()
-
-        try:
-            if hasattr(image, 'format') and image.format:
-                img_format = image.format
-            else:
-                # Default to PNG if format is not specified
-                img_format = "PNG"
-
-            image.save(buffered, format=img_format)
-            img_base64 = base64.b64encode(buffered.getvalue()).decode('utf-8')
-            return img_base64, img_format.lower()
-        
-        except Exception as e:
-            raise ValueError(f"Failed to convert image to base64: {e}")
         
     def batch_inference(self, images: List[Union[str, Image.Image]], questions: List[str]) -> List[str]:
         results = []
         for image, question in zip(images, questions):
             try:
+                # Load and resize image
+                image = load_image(image, max_size=1600)
+
                 if isinstance(image, Image.Image):
-                    img, img_type = self.img2base64(image)
+                    img, img_type = encode_image_base64(image)
                 else:
                     img, img_type = image, 'png'
 
