@@ -9,7 +9,6 @@ from loguru import logger
 import yaml
 from qwen_vl_utils import process_vision_info
 from PIL import Image
-import requests
 from typing import List, Union
 from openai import OpenAI
 
