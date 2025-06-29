@@ -29,4 +29,3 @@ def classify(pdf_bytes: bytes) -> SupportedPdfParseMethod:
                 return SupportedPdfParseMethod.TXT
             else:
                 return SupportedPdfParseMethod.OCR
-                return SupportedPdfParseMethod.OCR
