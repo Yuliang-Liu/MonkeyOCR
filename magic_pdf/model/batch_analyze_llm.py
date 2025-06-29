@@ -2,9 +2,6 @@ import base64
 import copy
 import time
 
-import cv2
-import numpy as np
-import torch
 from loguru import logger
 
 from magic_pdf.config.constants import MODEL_NAME

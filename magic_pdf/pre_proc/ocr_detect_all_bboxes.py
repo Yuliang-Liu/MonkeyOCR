@@ -5,7 +5,6 @@ from magic_pdf.libs.boxbase import (
     calculate_vertical_projection_overlap_ratio,
     get_minbox_if_overlap_by_ratio
 )
-from magic_pdf.pre_proc.remove_bbox_overlap import remove_overlap_between_bbox_for_block
 
 
 def add_bboxes(blocks, block_type, bboxes):

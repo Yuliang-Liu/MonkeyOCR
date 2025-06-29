@@ -1,7 +1,5 @@
 import copy
 
-from loguru import logger
-
 from magic_pdf.config.constants import CROSS_PAGE, LINES_DELETED
 from magic_pdf.config.ocr_content_type import BlockType, ContentType
 from magic_pdf.libs.language import detect_lang
@@ -31,10 +29,6 @@ class ListLineTag:
 
 
 def __process_blocks(blocks):
-
-
-
-
     result = []
     current_group = []
 
@@ -69,14 +63,6 @@ def __process_blocks(blocks):
 
 
 def __is_list_or_index_block(block):
-
-
-
-
-
-
-
-
     if len(block['lines']) >= 2:
         first_line = block['lines'][0]
         line_height = first_line['bbox'][3] - first_line['bbox'][1]
@@ -317,12 +303,11 @@ def __merge_2_list_blocks(block1, block2):
 
 
 def __is_list_group(text_blocks_group):
-
-
     for block in text_blocks_group:
         if len(block['lines']) > 3:
             return False
     return True
+
 
 def __is_list_group_llm(text_blocks_group):
     for block in text_blocks_group:
