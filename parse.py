@@ -76,7 +76,7 @@ def parse_folder(folder_path, output_dir, config_path, task=None):
             if task:
                 result_dir = single_task_recognition(file_path, output_dir, MonkeyOCR_model, task)
             else:
-                result_dir = parse_pdf(file_path, output_dir, MonkeyOCR_model)
+                result_dir = parse_file(file_path, output_dir, MonkeyOCR_model)
             
             successful_files.append(file_path)
             print(f"✅ Successfully processed: {os.path.basename(file_path)}")
@@ -203,12 +203,12 @@ def single_task_recognition(input_file, output_dir, MonkeyOCR_model, task):
     except Exception as e:
         raise RuntimeError(f"Single task recognition failed: {str(e)}")
 
-def parse_pdf(input_file, output_dir, MonkeyOCR_model):
+def parse_file(input_file, output_dir, MonkeyOCR_model, split_pages=False):
     """
-    Parse PDF file and save results
+    Parse PDF or image and save results
     
     Args:
-        input_file: Input PDF file path
+        input_file: Input PDF or image file path
         output_dir: Output directory
         MonkeyOCR_model: Pre-initialized model instance
     """
@@ -247,25 +247,67 @@ def parse_pdf(input_file, output_dir, MonkeyOCR_model):
     print("Performing document parsing...")
     start_time = time.time()
     
-    infer_result = ds.apply(doc_analyze_llm, MonkeyOCR_model=MonkeyOCR_model)
-    
-    # Pipeline processing
-    pipe_result = infer_result.pipe_ocr_mode(image_writer, MonkeyOCR_model=MonkeyOCR_model)
+    infer_result = ds.apply(doc_analyze_llm, MonkeyOCR_model=MonkeyOCR_model, split_pages=split_pages)
     
     parsing_time = time.time() - start_time
     print(f"Parsing time: {parsing_time:.2f}s")
 
-    infer_result.draw_model(os.path.join(local_md_dir, f"{name_without_suff}_model.pdf"))
-    
-    pipe_result.draw_layout(os.path.join(local_md_dir, f"{name_without_suff}_layout.pdf"))
+    # Check if infer_result is a list type
+    if isinstance(infer_result, list):
+        print(f"Processing {len(infer_result)} pages separately...")
+        
+        # Process each page result separately
+        for page_idx, page_infer_result in enumerate(infer_result):
+            page_dir_name = f"page_{page_idx}"
+            page_local_image_dir = os.path.join(output_dir, name_without_suff, page_dir_name, "images")
+            page_local_md_dir = os.path.join(output_dir, name_without_suff, page_dir_name)
+            page_image_dir = os.path.basename(page_local_image_dir)
+            
+            # Create page-specific directories
+            os.makedirs(page_local_image_dir, exist_ok=True)
+            os.makedirs(page_local_md_dir, exist_ok=True)
+            
+            # Create page-specific writers
+            page_image_writer = FileBasedDataWriter(page_local_image_dir)
+            page_md_writer = FileBasedDataWriter(page_local_md_dir)
+            
+            print(f"Processing page {page_idx} - Output dir: {page_local_md_dir}")
+            
+            # Pipeline processing for this page
+            page_pipe_result = page_infer_result.pipe_ocr_mode(page_image_writer, MonkeyOCR_model=MonkeyOCR_model)
+            
+            # Save page-specific results
+            page_infer_result.draw_model(os.path.join(page_local_md_dir, f"{name_without_suff}_page_{page_idx}_model.pdf"))
+            
+            page_pipe_result.draw_layout(os.path.join(page_local_md_dir, f"{name_without_suff}_page_{page_idx}_layout.pdf"))
 
-    pipe_result.draw_span(os.path.join(local_md_dir, f"{name_without_suff}_spans.pdf"))
+            page_pipe_result.draw_span(os.path.join(page_local_md_dir, f"{name_without_suff}_page_{page_idx}_spans.pdf"))
 
-    pipe_result.dump_md(md_writer, f"{name_without_suff}.md", image_dir)
-    
-    pipe_result.dump_content_list(md_writer, f"{name_without_suff}_content_list.json", image_dir)
+            page_pipe_result.dump_md(page_md_writer, f"{name_without_suff}_page_{page_idx}.md", page_image_dir)
+            
+            page_pipe_result.dump_content_list(page_md_writer, f"{name_without_suff}_page_{page_idx}_content_list.json", page_image_dir)
 
-    pipe_result.dump_middle_json(md_writer, f'{name_without_suff}_middle.json')
+            page_pipe_result.dump_middle_json(page_md_writer, f'{name_without_suff}_page_{page_idx}_middle.json')
+        
+        print(f"All {len(infer_result)} pages processed and saved in separate subdirectories")
+    else:
+        print("Processing as single result...")
+        
+        # Pipeline processing for single result
+        pipe_result = infer_result.pipe_ocr_mode(image_writer, MonkeyOCR_model=MonkeyOCR_model)
+        
+        # Save single result (original logic)
+        infer_result.draw_model(os.path.join(local_md_dir, f"{name_without_suff}_model.pdf"))
+        
+        pipe_result.draw_layout(os.path.join(local_md_dir, f"{name_without_suff}_layout.pdf"))
+
+        pipe_result.draw_span(os.path.join(local_md_dir, f"{name_without_suff}_spans.pdf"))
+
+        pipe_result.dump_md(md_writer, f"{name_without_suff}.md", image_dir)
+        
+        pipe_result.dump_content_list(md_writer, f"{name_without_suff}_content_list.json", image_dir)
+
+        pipe_result.dump_middle_json(md_writer, f'{name_without_suff}_middle.json')
     
     print("Results saved to ", local_md_dir)
     return local_md_dir
@@ -311,6 +353,12 @@ Usage examples:
         choices=['text', 'formula', 'table'],
         help="Single task recognition type (text/formula/table). Supports both image and PDF files."
     )
+
+    parser.add_argument(
+        "-s", "--split_pages",
+        action='store_true',
+        help="Split the output of PDF pages into separate ones (default: False)"
+    )
     
     args = parser.parse_args()
     
@@ -345,10 +393,11 @@ Usage examples:
                 )
                 print(f"\n✅ Single task ({args.task}) recognition completed! Results saved in: {result_dir}")
             else:
-                result_dir = parse_pdf(
+                result_dir = parse_file(
                     args.input_path,
                     args.output,
-                    MonkeyOCR_model
+                    MonkeyOCR_model,
+                    args.split_pages
                 )
                 print(f"\n✅ Parsing completed! Results saved in: {result_dir}")
         else:

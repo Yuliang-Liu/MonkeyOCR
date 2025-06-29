@@ -22,7 +22,7 @@ from loguru import logger
 import time
 
 from magic_pdf.model.custom_model import MonkeyOCR
-from parse import single_task_recognition, parse_pdf
+from parse import single_task_recognition, parse_file
 import uvicorn
 
 # Response models
@@ -110,6 +110,15 @@ async def extract_table(file: UploadFile = File(...)):
 @app.post("/parse", response_model=ParseResponse)
 async def parse_document(file: UploadFile = File(...)):
     """Parse complete document (PDF only)"""
+    return await parse_document_internal(file, split_pages=False)
+
+@app.post("/parse/split", response_model=ParseResponse)
+async def parse_document_split(file: UploadFile = File(...)):
+    """Parse complete document with page splitting (PDF only)"""
+    return await parse_document_internal(file, split_pages=True)
+
+async def parse_document_internal(file: UploadFile, split_pages: bool = False):
+    """Internal function to parse document with optional page splitting"""
     try:
         if not monkey_ocr_model:
             raise HTTPException(status_code=500, detail="Model not initialized")
@@ -133,7 +142,7 @@ async def parse_document(file: UploadFile = File(...)):
             
             # Define a function that uses the model (this will be locked)
             def run_parse_with_model():
-                return parse_pdf(temp_file_path, output_dir, monkey_ocr_model)
+                return parse_file(temp_file_path, output_dir, monkey_ocr_model, split_pages)
             
             # Only lock during model inference
             async with model_lock:
@@ -149,7 +158,8 @@ async def parse_document(file: UploadFile = File(...)):
                         files.append(rel_path)
             
             # Create download URL with original filename
-            zip_filename = f"{original_name}_parsed_{int(time.time())}.zip"
+            suffix = "_split" if split_pages else "_parsed"
+            zip_filename = f"{original_name}{suffix}_{int(time.time())}.zip"
             zip_path = os.path.join(temp_dir, zip_filename)
             
             # Create ZIP file with renamed files
@@ -157,41 +167,62 @@ async def parse_document(file: UploadFile = File(...)):
                 for root, dirs, filenames in os.walk(result_dir):
                     for filename in filenames:
                         file_path = os.path.join(root, filename)
+                        rel_path = os.path.relpath(file_path, result_dir)
                         
-                        # Create new filename with original name prefix
-                        file_ext = os.path.splitext(filename)[1]
-                        file_base = os.path.splitext(filename)[0]
-                        
-                        # Handle different file types
-                        if filename.endswith('.md'):
-                            new_filename = f"{original_name}.md"
-                        elif filename.endswith('_content_list.json'):
-                            new_filename = f"{original_name}_content_list.json"
-                        elif filename.endswith('_middle.json'):
-                            new_filename = f"{original_name}_middle.json"
-                        elif filename.endswith('_model.pdf'):
-                            new_filename = f"{original_name}_model.pdf"
-                        elif filename.endswith('_layout.pdf'):
-                            new_filename = f"{original_name}_layout.pdf"
-                        elif filename.endswith('_spans.pdf'):
-                            new_filename = f"{original_name}_spans.pdf"
-                        else:
-                            # For images and other files, keep relative path structure but rename
-                            rel_path = os.path.relpath(file_path, result_dir)
-                            if 'images/' in rel_path:
-                                # Keep images in images subfolder with original name prefix
-                                image_name = os.path.basename(rel_path)
-                                new_filename = f"images/{original_name}_{image_name}"
+                        if split_pages:
+                            # For split pages, maintain the page directory structure
+                            # but add original name prefix
+                            if rel_path.startswith('page_'):
+                                # Keep the page structure: page_0/filename -> page_0/original_name_filename
+                                parts = rel_path.split('/', 1)
+                                if len(parts) == 2:
+                                    page_dir, filename_part = parts
+                                    if filename_part.startswith('images/'):
+                                        # Handle images: page_0/images/img.jpg -> page_0/images/original_name_img.jpg
+                                        img_name = filename_part.replace('images/', '')
+                                        new_filename = f"{page_dir}/images/{original_name}_{img_name}"
+                                    else:
+                                        # Handle other files in page directories
+                                        new_filename = f"{page_dir}/{original_name}_{filename_part}"
+                                else:
+                                    new_filename = f"{original_name}_{rel_path}"
                             else:
-                                new_filename = f"{original_name}_{filename}"
+                                new_filename = f"{original_name}_{rel_path}"
+                        else:
+                            # Original non-split logic
+                            file_ext = os.path.splitext(filename)[1]
+                            file_base = os.path.splitext(filename)[0]
+                            
+                            # Handle different file types
+                            if filename.endswith('.md'):
+                                new_filename = f"{original_name}.md"
+                            elif filename.endswith('_content_list.json'):
+                                new_filename = f"{original_name}_content_list.json"
+                            elif filename.endswith('_middle.json'):
+                                new_filename = f"{original_name}_middle.json"
+                            elif filename.endswith('_model.pdf'):
+                                new_filename = f"{original_name}_model.pdf"
+                            elif filename.endswith('_layout.pdf'):
+                                new_filename = f"{original_name}_layout.pdf"
+                            elif filename.endswith('_spans.pdf'):
+                                new_filename = f"{original_name}_spans.pdf"
+                            else:
+                                # For images and other files, keep relative path structure but rename
+                                if 'images/' in rel_path:
+                                    # Keep images in images subfolder with original name prefix
+                                    image_name = os.path.basename(rel_path)
+                                    new_filename = f"images/{original_name}_{image_name}"
+                                else:
+                                    new_filename = f"{original_name}_{filename}"
                         
                         zipf.write(file_path, new_filename)
             
             download_url = f"/static/{zip_filename}"
             
+            parse_type = "with page splitting" if split_pages else "standard"
             return ParseResponse(
                 success=True,
-                message="Document parsing completed successfully",
+                message=f"Document parsing ({parse_type}) completed successfully",
                 output_dir=result_dir,
                 files=files,
                 download_url=download_url
