@@ -211,6 +211,7 @@ def parse_file(input_file, output_dir, MonkeyOCR_model, split_pages=False):
         input_file: Input PDF or image file path
         output_dir: Output directory
         MonkeyOCR_model: Pre-initialized model instance
+        split_pages: Whether to split result by pages
     """
     print(f"Starting to parse file: {input_file}")
     
