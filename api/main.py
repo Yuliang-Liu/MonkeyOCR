@@ -109,12 +109,12 @@ async def extract_table(file: UploadFile = File(...)):
 
 @app.post("/parse", response_model=ParseResponse)
 async def parse_document(file: UploadFile = File(...)):
-    """Parse complete document (PDF only)"""
+    """Parse complete document (PDF or image)"""
     return await parse_document_internal(file, split_pages=False)
 
 @app.post("/parse/split", response_model=ParseResponse)
 async def parse_document_split(file: UploadFile = File(...)):
-    """Parse complete document with page splitting (PDF only)"""
+    """Parse complete document and split result by pages (PDF or image)"""
     return await parse_document_internal(file, split_pages=True)
 
 async def parse_document_internal(file: UploadFile, split_pages: bool = False):
@@ -123,15 +123,22 @@ async def parse_document_internal(file: UploadFile, split_pages: bool = False):
         if not monkey_ocr_model:
             raise HTTPException(status_code=500, detail="Model not initialized")
         
-        # Validate file type
-        if not file.filename.lower().endswith('.pdf'):
-            raise HTTPException(status_code=400, detail="Only PDF files are supported for document parsing")
+        # Validate file type - support both PDF and image files
+        allowed_extensions = {'.pdf', '.jpg', '.jpeg', '.png'}
+        file_ext = file.filename.lower().split('.')[-1] if file.filename else ''
+        file_ext_with_dot = f'.{file_ext}'
+        
+        if file_ext_with_dot not in allowed_extensions:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Unsupported file type: {file_ext_with_dot}. Allowed: {', '.join(allowed_extensions)}"
+            )
         
         # Get original filename without extension
         original_name = '.'.join(file.filename.split('.')[:-1])
         
         # Save uploaded file temporarily
-        with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as temp_file:
+        with tempfile.NamedTemporaryFile(delete=False, suffix=file_ext_with_dot) as temp_file:
             content = await file.read()
             temp_file.write(content)
             temp_file_path = temp_file.name
@@ -219,10 +226,13 @@ async def parse_document_internal(file: UploadFile, split_pages: bool = False):
             
             download_url = f"/static/{zip_filename}"
             
+            # Determine file type for response message
+            file_type = "PDF" if file_ext_with_dot == '.pdf' else "image"
             parse_type = "with page splitting" if split_pages else "standard"
+            
             return ParseResponse(
                 success=True,
-                message=f"Document parsing ({parse_type}) completed successfully",
+                message=f"{file_type} parsing ({parse_type}) completed successfully",
                 output_dir=result_dir,
                 files=files,
                 download_url=download_url
