@@ -125,8 +125,7 @@ async def parse_document_internal(file: UploadFile, split_pages: bool = False):
         
         # Validate file type - support both PDF and image files
         allowed_extensions = {'.pdf', '.jpg', '.jpeg', '.png'}
-        file_ext = file.filename.lower().split('.')[-1] if file.filename else ''
-        file_ext_with_dot = f'.{file_ext}'
+        file_ext_with_dot = os.path.splitext(file.filename)[1].lower() if file.filename else ''
         
         if file_ext_with_dot not in allowed_extensions:
             raise HTTPException(
