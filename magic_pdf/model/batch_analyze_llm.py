@@ -16,7 +16,7 @@ class BatchAnalyzeLLM:
     def __init__(self, model):
         self.model = model
 
-    def __call__(self, images: list) -> list:
+    def __call__(self, images: list, split_pages: bool = False) -> list:
         images_layout_res = []
 
         layout_start_time = time.time()
@@ -50,6 +50,49 @@ class BatchAnalyzeLLM:
 
         clean_vram(self.model.device, vram_threshold=8)
 
+        # Check if split_pages is True and handle pages without valid cids
+        if split_pages:
+            cid2instruction = [0, 1, 4, 5, 6, 7, 8, 14, 101]
+            
+            pages_to_process_directly = []
+            for index in range(len(images)):
+                layout_res = images_layout_res[index]
+                # Check if this page has any valid cids
+                has_valid_cid = any(res['category_id'] in cid2instruction for res in layout_res)
+                
+                if not has_valid_cid:
+                    pages_to_process_directly.append(index)
+                    logger.info(f'Page {index} has no valid layout elements, will process directly')
+            
+            # Process pages without valid cids directly
+            if pages_to_process_directly:
+                direct_images = []
+                direct_messages = []
+                for page_idx in pages_to_process_directly:
+                    pil_img = Image.fromarray(images[page_idx])
+                    direct_images.append(pil_img)
+                    direct_messages.append(f'''Please output the text content from the image.''')
+                
+                # Get direct recognition results
+                direct_results = self.model.chat_model.batch_inference(direct_images, direct_messages)
+                
+                # Replace layout results for these pages
+                for i, page_idx in enumerate(pages_to_process_directly):
+                    # Create a single result covering the whole page
+                    height, width = images[page_idx].shape[:2]
+                    pre_res = {
+                        'category_id': 200,
+                        'score': 1.0,
+                        'poly': [0, 0, width, 0, width, height, 0, height]
+                    }
+                    single_res = {
+                        'category_id': 15,
+                        'score': 1.0,
+                        'text': direct_results[i],
+                        'poly': [0, 0, width, 0, width, height, 0, height]
+                    }
+                    images_layout_res[page_idx] = [pre_res, single_res]
+
         llm_ocr_start = time.time()
         new_images_all = []
         cids_all = []
@@ -76,7 +119,6 @@ class BatchAnalyzeLLM:
             for i in range(len(layout_res)):
                 res = layout_res[i]
                 ocr = ocr_result[page_idxs[index]+i]
-                # ocr = self.llm_ocr(new_image, res['category_id'])
                 if res['category_id'] in [8, 14]:
                     temp_res = copy.deepcopy(res)
                     temp_res['category_id'] = 14
@@ -92,6 +134,11 @@ class BatchAnalyzeLLM:
                 elif res['category_id'] == 5:
                     res['score'] = 1.0
                     res['html'] = ocr
+                elif res['category_id'] == 15:
+                    # This is already a direct recognition result, keep it as is
+                    pass
+                elif res['category_id'] == 200:
+                    res['category_id'] = 1
             layout_res.extend(ocr_results)
             logger.info(f'OCR processed images / total images: {index+1} / {len(images)}')
         logger.info(

@@ -32,7 +32,7 @@ def doc_analyze_llm(
             page_data = dataset.get_page(index)
             img_dict = page_data.get_image()
             images.append(img_dict['img'])
-    analyze_result = batch_model(images)
+    analyze_result = batch_model(images,split_pages=split_pages)
 
     inference_results = []
     for index in range(len(dataset)):

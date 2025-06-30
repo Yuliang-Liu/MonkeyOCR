@@ -9,7 +9,7 @@ import torch.distributed as dist
 from pdf2image import convert_from_path
 
 from magic_pdf.data.data_reader_writer import FileBasedDataWriter, FileBasedDataReader
-from magic_pdf.data.dataset import PymuDocDataset, ImageDataset
+from magic_pdf.data.dataset import PymuDocDataset, ImageDataset, MultiImageDataset
 from magic_pdf.model.doc_analyze_by_custom_model_llm import doc_analyze_llm
 from magic_pdf.model.custom_model import MonkeyOCR
 
@@ -19,7 +19,7 @@ TASK_INSTRUCTIONS = {
     'table': 'Please output the table in the image in LaTeX format.'
 }
 
-def parse_folder(folder_path, output_dir, config_path, task=None):
+def parse_folder(folder_path, output_dir, config_path, task=None, group_size=None):
     """
     Parse all PDF and image files in a folder
     
@@ -28,8 +28,12 @@ def parse_folder(folder_path, output_dir, config_path, task=None):
         output_dir: Output directory
         config_path: Configuration file path
         task: Optional task type for single task recognition
+        group_size: Number of images to group together as MultiImageDataset (None means process individually)
     """
     print(f"Starting to parse folder: {folder_path}")
+    
+    # Record start time for total processing time
+    total_start_time = time.time()
     
     # Check if folder exists
     if not os.path.exists(folder_path):
@@ -40,58 +44,125 @@ def parse_folder(folder_path, output_dir, config_path, task=None):
     
     # Find all supported files
     supported_extensions = {'.pdf', '.jpg', '.jpeg', '.png'}
-    files_to_process = []
+    pdf_files = []
+    image_files = []
     
     for root, dirs, files in os.walk(folder_path):
         for file in files:
             file_path = os.path.join(root, file)
             file_ext = os.path.splitext(file)[1].lower()
-            if file_ext in supported_extensions:
-                files_to_process.append(file_path)
+            if file_ext == '.pdf':
+                pdf_files.append(file_path)
+            elif file_ext in {'.jpg', '.jpeg', '.png'}:
+                image_files.append(file_path)
     
-    files_to_process.sort()  # Sort for consistent processing order
-    
-    if not files_to_process:
-        print("No supported files found in the folder.")
-        return
-    
-    print(f"Found {len(files_to_process)} files to process:")
-    for file_path in files_to_process:
-        print(f"  - {file_path}")
+    pdf_files.sort()
+    image_files.sort()
     
     # Initialize model once for all files
     print("Loading model...")
     MonkeyOCR_model = MonkeyOCR(config_path)
     
-    # Process each file
     successful_files = []
     failed_files = []
     
-    for i, file_path in enumerate(files_to_process, 1):
-        print(f"\n{'='*60}")
-        print(f"Processing file {i}/{len(files_to_process)}: {os.path.basename(file_path)}")
-        print(f"{'='*60}")
+    # Process PDF files individually
+    if pdf_files:
+        print(f"Found {len(pdf_files)} PDF files to process:")
+        for file_path in pdf_files:
+            print(f"  - {file_path}")
         
-        try:
-            if task:
-                result_dir = single_task_recognition(file_path, output_dir, MonkeyOCR_model, task)
-            else:
-                result_dir = parse_file(file_path, output_dir, MonkeyOCR_model)
+        for i, file_path in enumerate(pdf_files, 1):
+            print(f"\n{'='*60}")
+            print(f"Processing PDF file {i}/{len(pdf_files)}: {os.path.basename(file_path)}")
+            print(f"{'='*60}")
             
-            successful_files.append(file_path)
-            print(f"✅ Successfully processed: {os.path.basename(file_path)}")
+            try:
+                if task:
+                    result_dir = single_task_recognition(file_path, output_dir, MonkeyOCR_model, task)
+                else:
+                    result_dir = parse_file(file_path, output_dir, MonkeyOCR_model)
+                
+                successful_files.append(file_path)
+                print(f"✅ Successfully processed: {os.path.basename(file_path)}")
+                
+            except Exception as e:
+                failed_files.append((file_path, str(e)))
+                print(f"❌ Failed to process {os.path.basename(file_path)}: {str(e)}")
+    
+    # Process image files
+    if image_files:
+        if group_size and group_size > 1:
+            # Group images and process as MultiImageDataset
+            print(f"Found {len(image_files)} image files to process in groups of {group_size}")
             
-        except Exception as e:
-            failed_files.append((file_path, str(e)))
-            print(f"❌ Failed to process {os.path.basename(file_path)}: {str(e)}")
+            # Create groups of images
+            image_groups = []
+            for i in range(0, len(image_files), group_size):
+                group = image_files[i:i + group_size]
+                image_groups.append(group)
+            
+            print(f"Created {len(image_groups)} image groups")
+            
+            for i, image_group in enumerate(image_groups, 1):
+                print(f"\n{'='*60}")
+                print(f"Processing image group {i}/{len(image_groups)} (contains {len(image_group)} images)")
+                for img_path in image_group:
+                    print(f"  - {os.path.basename(img_path)}")
+                print(f"{'='*60}")
+                
+                try:
+                    if task:
+                        result_dir = single_task_recognition_group(image_group, output_dir, MonkeyOCR_model, task, folder_path)
+                    else:
+                        result_dir = parse_image_group(image_group, output_dir, MonkeyOCR_model, folder_path)
+                    
+                    successful_files.extend(image_group)
+                    print(f"✅ Successfully processed image group {i}")
+                    
+                except Exception as e:
+                    failed_files.extend([(path, str(e)) for path in image_group])
+                    print(f"❌ Failed to process image group {i}: {str(e)}")
+        else:
+            # Process images individually
+            print(f"Found {len(image_files)} image files to process individually:")
+            for file_path in image_files:
+                print(f"  - {file_path}")
+            
+            for i, file_path in enumerate(image_files, 1):
+                print(f"\n{'='*60}")
+                print(f"Processing image file {i}/{len(image_files)}: {os.path.basename(file_path)}")
+                print(f"{'='*60}")
+                
+                try:
+                    if task:
+                        result_dir = single_task_recognition(file_path, output_dir, MonkeyOCR_model, task)
+                    else:
+                        result_dir = parse_file(file_path, output_dir, MonkeyOCR_model)
+                    
+                    successful_files.append(file_path)
+                    print(f"✅ Successfully processed: {os.path.basename(file_path)}")
+                    
+                except Exception as e:
+                    failed_files.append((file_path, str(e)))
+                    print(f"❌ Failed to process {os.path.basename(file_path)}: {str(e)}")
+    
+    if not pdf_files and not image_files:
+        print("No supported files found in the folder.")
+        return
+    
+    # Calculate total processing time
+    total_processing_time = time.time() - total_start_time
     
     # Summary
+    total_files = len(pdf_files) + len(image_files)
     print(f"\n{'='*60}")
     print("PROCESSING SUMMARY")
     print(f"{'='*60}")
-    print(f"Total files: {len(files_to_process)}")
+    print(f"Total files: {total_files}")
     print(f"Successful: {len(successful_files)}")
     print(f"Failed: {len(failed_files)}")
+    print(f"Total processing time: {total_processing_time:.2f}s")
     
     if failed_files:
         print("\nFailed files:")
@@ -99,6 +170,216 @@ def parse_folder(folder_path, output_dir, config_path, task=None):
             print(f"  - {os.path.basename(file_path)}: {error}")
     
     return output_dir
+
+def parse_image_group(image_paths, output_dir, MonkeyOCR_model, base_folder_path):
+    """
+    Parse a group of images using MultiImageDataset
+    
+    Args:
+        image_paths: List of image file paths
+        output_dir: Output directory
+        MonkeyOCR_model: Pre-initialized model instance
+        base_folder_path: Base folder path for maintaining relative structure
+    """
+    print(f"Starting to parse image group with {len(image_paths)} images")
+    
+    # Maintain relative path structure from base folder
+    rel_path = os.path.relpath(os.path.dirname(image_paths[0]), base_folder_path)
+    
+    # Read all image files
+    reader = FileBasedDataReader()
+    image_bytes_list = []
+    
+    for image_path in image_paths:
+        if not os.path.exists(image_path):
+            raise FileNotFoundError(f"Image file does not exist: {image_path}")
+        
+        image_bytes = reader.read(image_path)
+        image_bytes_list.append(image_bytes)
+    
+    # Create MultiImageDataset
+    ds = MultiImageDataset(image_bytes_list)
+    
+    # Start inference with split_pages=True to get individual results
+    print("Performing document parsing on image group...")
+    start_time = time.time()
+    
+    infer_result = ds.apply(doc_analyze_llm, MonkeyOCR_model=MonkeyOCR_model, split_pages=True)
+    
+    parsing_time = time.time() - start_time
+    print(f"Parsing time: {parsing_time:.2f}s")
+
+    # Check if infer_result is a list (should be with split_pages=True)
+    if isinstance(infer_result, list) and len(infer_result) == len(image_paths):
+        print(f"Processing {len(infer_result)} images separately...")
+        
+        # Process each image result separately using original image names
+        for img_idx, (page_infer_result, image_path) in enumerate(zip(infer_result, image_paths)):
+            # Get original image name without extension
+            image_name = '.'.join(os.path.basename(image_path).split(".")[:-1])
+            
+            # Create output directory for this specific image
+            if rel_path == '.':
+                image_local_md_dir = os.path.join(output_dir, image_name)
+            else:
+                image_local_md_dir = os.path.join(output_dir, rel_path, image_name)
+            
+            image_local_image_dir = os.path.join(image_local_md_dir, "images")
+            image_dir = os.path.basename(image_local_image_dir)
+            
+            # Create image-specific directories
+            os.makedirs(image_local_image_dir, exist_ok=True)
+            os.makedirs(image_local_md_dir, exist_ok=True)
+            
+            # Create image-specific writers
+            image_image_writer = FileBasedDataWriter(image_local_image_dir)
+            image_md_writer = FileBasedDataWriter(image_local_md_dir)
+            
+            print(f"Processing image {img_idx + 1}/{len(infer_result)}: {image_name} - Output dir: {image_local_md_dir}")
+            
+            # Pipeline processing for this image
+            image_pipe_result = page_infer_result.pipe_ocr_mode(image_image_writer, MonkeyOCR_model=MonkeyOCR_model)
+            
+            # Save image-specific results using original image name
+            page_infer_result.draw_model(os.path.join(image_local_md_dir, f"{image_name}_model.pdf"))
+            
+            image_pipe_result.draw_layout(os.path.join(image_local_md_dir, f"{image_name}_layout.pdf"))
+
+            image_pipe_result.draw_span(os.path.join(image_local_md_dir, f"{image_name}_spans.pdf"))
+
+            image_pipe_result.dump_md(image_md_writer, f"{image_name}.md", image_dir)
+            
+            image_pipe_result.dump_content_list(image_md_writer, f"{image_name}_content_list.json", image_dir)
+
+            image_pipe_result.dump_middle_json(image_md_writer, f'{image_name}_middle.json')
+        
+        print(f"All {len(infer_result)} images processed and saved in separate directories using original image names")
+        
+        # Return the base directory containing all individual image results
+        if rel_path == '.':
+            return output_dir
+        else:
+            return os.path.join(output_dir, rel_path)
+    else:
+        # Fallback: if split_pages didn't work as expected, use the old logic
+        print("Warning: split_pages didn't return expected individual results, using group processing...")
+        
+        # Create group name based on first and last image names
+        first_name = '.'.join(os.path.basename(image_paths[0]).split(".")[:-1])
+        last_name = '.'.join(os.path.basename(image_paths[-1]).split(".")[:-1])
+        group_name = f"{first_name}_to_{last_name}_group"
+        
+        if rel_path == '.':
+            local_md_dir = os.path.join(output_dir, group_name)
+        else:
+            local_md_dir = os.path.join(output_dir, rel_path, group_name)
+        
+        local_image_dir = os.path.join(local_md_dir, "images")
+        image_dir = os.path.basename(local_image_dir)
+        os.makedirs(local_image_dir, exist_ok=True)
+        os.makedirs(local_md_dir, exist_ok=True)
+        
+        print(f"Output dir: {local_md_dir}")
+        image_writer = FileBasedDataWriter(local_image_dir)
+        md_writer = FileBasedDataWriter(local_md_dir)
+        
+        # Pipeline processing for group result
+        pipe_result = infer_result.pipe_ocr_mode(image_writer, MonkeyOCR_model=MonkeyOCR_model)
+        
+        # Save group results
+        infer_result.draw_model(os.path.join(local_md_dir, f"{group_name}_model.pdf"))
+        pipe_result.draw_layout(os.path.join(local_md_dir, f"{group_name}_layout.pdf"))
+        pipe_result.draw_span(os.path.join(local_md_dir, f"{group_name}_spans.pdf"))
+        pipe_result.dump_md(md_writer, f"{group_name}.md", image_dir)
+        pipe_result.dump_content_list(md_writer, f"{group_name}_content_list.json", image_dir)
+        pipe_result.dump_middle_json(md_writer, f'{group_name}_middle.json')
+        
+        print("Results saved to ", local_md_dir)
+        return local_md_dir
+
+def single_task_recognition_group(image_paths, output_dir, MonkeyOCR_model, task, base_folder_path):
+    """
+    Single task recognition for a group of images
+    
+    Args:
+        image_paths: List of image file paths
+        output_dir: Output directory
+        MonkeyOCR_model: Pre-initialized model instance
+        task: Task type ('text', 'formula', 'table')
+        base_folder_path: Base folder path for maintaining relative structure
+    """
+    print(f"Starting single task recognition: {task} for image group with {len(image_paths)} images")
+    
+    # Create group name based on first and last image names
+    first_name = '.'.join(os.path.basename(image_paths[0]).split(".")[:-1])
+    last_name = '.'.join(os.path.basename(image_paths[-1]).split(".")[:-1])
+    group_name = f"{first_name}_to_{last_name}_group"
+    
+    # Maintain relative path structure from base folder
+    rel_path = os.path.relpath(os.path.dirname(image_paths[0]), base_folder_path)
+    if rel_path == '.':
+        local_md_dir = os.path.join(output_dir, group_name)
+    else:
+        local_md_dir = os.path.join(output_dir, rel_path, group_name)
+    
+    os.makedirs(local_md_dir, exist_ok=True)
+    
+    print(f"Output dir: {local_md_dir}")
+    md_writer = FileBasedDataWriter(local_md_dir)
+    
+    # Get task instruction
+    instruction = TASK_INSTRUCTIONS.get(task, TASK_INSTRUCTIONS['text'])
+    
+    # Load all images
+    from PIL import Image
+    images = []
+    for image_path in image_paths:
+        if not os.path.exists(image_path):
+            raise FileNotFoundError(f"Image file does not exist: {image_path}")
+        images.append(Image.open(image_path))
+    
+    # Start recognition
+    print(f"Performing {task} recognition on {len(images)} images...")
+    start_time = time.time()
+    
+    try:
+        # Prepare instructions for all images
+        instructions = [instruction] * len(images)
+        
+        # Use chat model for single task recognition with PIL images directly
+        responses = MonkeyOCR_model.chat_model.batch_inference(images, instructions)
+        
+        recognition_time = time.time() - start_time
+        print(f"Recognition time: {recognition_time:.2f}s")
+        
+        # Combine results
+        combined_result = responses[0]
+        for i, response in enumerate(responses):
+            if i > 0:
+                combined_result = combined_result + "\n\n" + response
+        
+        # Save result
+        result_filename = f"{group_name}_{task}_result.md"
+        md_writer.write(result_filename, combined_result.encode('utf-8'))
+        
+        print(f"Single task recognition completed!")
+        print(f"Task: {task}")
+        print(f"Processed {len(images)} images in group")
+        print(f"Result saved to: {os.path.join(local_md_dir, result_filename)}")
+        
+        # Clean up resources
+        try:
+            time.sleep(0.5)
+            for img in images:
+                if hasattr(img, 'close'):
+                    img.close()
+        except Exception as cleanup_error:
+            print(f"Warning: Error during cleanup: {cleanup_error}")
+        
+        return local_md_dir
+        
+    except Exception as e:
+        raise RuntimeError(f"Single task recognition failed: {str(e)}")
 
 def single_task_recognition(input_file, output_dir, MonkeyOCR_model, task):
     """
@@ -323,7 +604,9 @@ Usage examples:
   python parse.py input.pdf                  # Parse single PDF file
   python parse.py input.pdf -o ./output      # Parse single PDF with custom output dir
   python parse.py /path/to/folder            # Parse all files in folder
+  python parse.py /path/to/folder -g 5       # Group every 5 images as MultiImageDataset
   python parse.py /path/to/folder -t text    # Single task recognition for all files in folder
+  python parse.py /path/to/folder -t text -g 5  # Single task recognition with image grouping
   python parse.py input.pdf -c model_configs.yaml
   python parse.py image.jpg -t text          # Single task: text recognition
   python parse.py image.jpg -t formula       # Single task: formula recognition  
@@ -361,6 +644,12 @@ Usage examples:
         help="Split the output of PDF pages into separate ones (default: False)"
     )
     
+    parser.add_argument(
+        "-g", "--group-size",
+        type=int,
+        help="Number of images to group together as MultiImageDataset when processing folders (only applies to image files)"
+    )
+    
     args = parser.parse_args()
     
     MonkeyOCR_model = None
@@ -373,13 +662,20 @@ Usage examples:
                 args.input_path,
                 args.output,
                 args.config,
-                args.task
+                args.task,
+                args.group_size
             )
             
             if args.task:
-                print(f"\n✅ Folder processing with single task ({args.task}) recognition completed! Results saved in: {result_dir}")
+                if args.group_size:
+                    print(f"\n✅ Folder processing with single task ({args.task}) recognition and image grouping (size: {args.group_size}) completed! Results saved in: {result_dir}")
+                else:
+                    print(f"\n✅ Folder processing with single task ({args.task}) recognition completed! Results saved in: {result_dir}")
             else:
-                print(f"\n✅ Folder processing completed! Results saved in: {result_dir}")
+                if args.group_size:
+                    print(f"\n✅ Folder processing with image grouping (size: {args.group_size}) completed! Results saved in: {result_dir}")
+                else:
+                    print(f"\n✅ Folder processing completed! Results saved in: {result_dir}")
         elif os.path.isfile(args.input_path):
             # Process single file - initialize model for single file processing
             print("Loading model...")
