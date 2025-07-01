@@ -68,8 +68,10 @@ class MagicModel:
         for model_page_info in self.__model_list:
             need_remove_list = []
             layout_dets = model_page_info['layout_dets']
-            for layout_det1 in layout_dets:
-                for layout_det2 in layout_dets:
+            for i in range(len(layout_dets)):
+                for j in range(i + 1, len(layout_dets)):
+                    layout_det1 = layout_dets[i]
+                    layout_det2 = layout_dets[j]
                     if layout_det1 == layout_det2:
                         continue
                     if layout_det1['category_id'] in [
