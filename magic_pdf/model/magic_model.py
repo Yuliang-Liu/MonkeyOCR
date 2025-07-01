@@ -72,8 +72,6 @@ class MagicModel:
                 for j in range(i + 1, len(layout_dets)):
                     layout_det1 = layout_dets[i]
                     layout_det2 = layout_dets[j]
-                    if layout_det1 == layout_det2:
-                        continue
                     if layout_det1['category_id'] in [
                         0,
                         1,
