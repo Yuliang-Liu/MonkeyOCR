@@ -61,23 +61,56 @@ python tools/download_model.py -t modelscope
 ### 3. Inference
 You can parse a file or a directory containing PDFs or images using the following commands:
 ```bash
-# Make sure you are in the MonkeyOCR directory
 # Replace input_path with the path to a PDF or image or directory
+
 # End-to-end parsing
 python parse.py input_path
+
+# Parse files in a dir with specific group page num
+python parse.py input_path -g 20
 
 # Single-task recognition (outputs markdown only)
 python parse.py input_path -t text/formula/table
 
+# Parse PDFs in input_path and split results by pages
+python parse.py input_path -s
+
 # Specify output directory and model config file
 python parse.py input_path -o ./output -c config.yaml
-
-# Parse images in input_path(a dir) in groups with specific group size
-python parse.py input_path -g 20
-
-# Parse a PDF and split results by pages
-python parse.py your.pdf -s
 ```
+
+<details>
+<summary><b>More usage examples</b></summary>
+
+```bash
+# Single file processing
+python parse.py input.pdf                           # Parse single PDF file
+python parse.py input.pdf -o ./output               # Parse with custom output dir
+python parse.py input.pdf -s                        # Parse PDF with page splitting
+python parse.py image.jpg                           # Parse single image file
+
+# Single task recognition
+python parse.py image.jpg -t text                   # Text recognition from image
+python parse.py image.jpg -t formula                # Formula recognition from image
+python parse.py image.jpg -t table                  # Table recognition from image
+python parse.py document.pdf -t text                # Text recognition from all PDF pages
+
+# Folder processing (all files individually)
+python parse.py /path/to/folder                     # Parse all files in folder
+python parse.py /path/to/folder -s                  # Parse with page splitting
+python parse.py /path/to/folder -t text             # Single task recognition for all files
+
+# Multi-file grouping (batch processing by page count)
+python parse.py /path/to/folder -g 5                # Group files with max 5 total pages
+python parse.py /path/to/folder -g 10 -s            # Group files with page splitting
+python parse.py /path/to/folder -g 8 -t text        # Group files for single task recognition
+
+# Advanced configurations
+python parse.py input.pdf -c model_configs.yaml     # Custom model configuration
+python parse.py /path/to/folder -g 15 -s -o ./out   # Group files, split pages, custom output
+```
+
+</details>
 
 > [!TIP]
 > 

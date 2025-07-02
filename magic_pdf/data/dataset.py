@@ -301,27 +301,83 @@ class ImageDataset(Dataset):
         """
         return ImageDataset(self._raw_data)
 
-class MultiImageDataset(Dataset):
-    def __init__(self, image_bytes_list: list[bytes]):
-        """Initialize the dataset with multiple images.
+
+class MultiFileDataset(Dataset):
+    def __init__(self, file_bytes_list: list[bytes], file_extensions: list[str] = None):
+        """Initialize the dataset with multiple files (PDFs and images).
 
         Args:
-            image_bytes_list (list[bytes]): list of image bytes that will be converted to a multi-page pdf
+            file_bytes_list (list[bytes]): list of file bytes (PDF or image) that will be converted to a multi-page pdf
+            file_extensions (list[str], optional): list of file extensions (e.g., ['.pdf', '.jpg', '.png']). 
+                                                  If provided, will be used to determine file type instead of trying to open files.
         """
-        if not image_bytes_list:
-            raise ValueError("image_bytes_list cannot be empty")
+        if not file_bytes_list:
+            raise ValueError("file_bytes_list cannot be empty")
+        
+        if file_extensions and len(file_extensions) != len(file_bytes_list):
+            raise ValueError("file_extensions length must match file_bytes_list length")
+        
+        # Track file information
+        self._file_info = []
+        self._raw_data = file_bytes_list
         
         # Create a new PDF document
         pdf_doc = fitz.open()
         
-        # Convert each image to PDF and insert into the main document
-        for img_bytes in image_bytes_list:
-            img_doc = fitz.open(stream=img_bytes)
-            pdf_bytes = img_doc.convert_to_pdf()
-            img_pdf = fitz.open('pdf', pdf_bytes)
-            pdf_doc.insert_pdf(img_pdf)
-            img_doc.close()
-            img_pdf.close()
+        # Process each file and insert into the main document
+        for i, file_bytes in enumerate(file_bytes_list):
+            if not file_bytes:
+                raise ValueError(f"File at index {i} has empty bytes")
+            
+            # Determine file type from extension if provided
+            if file_extensions:
+                ext = file_extensions[i].lower()
+                if ext == '.pdf':
+                    file_type = 'pdf'
+                    temp_doc = fitz.open('pdf', file_bytes)
+                elif ext in ['.jpg', '.jpeg', '.png', '.bmp']:
+                    file_type = 'image'
+                    temp_doc = fitz.open(stream=file_bytes)
+                else:
+                    raise ValueError(f"Unsupported file extension: {ext}")
+            else:
+                # Fallback to original detection method
+                try:
+                    temp_doc = fitz.open('pdf', file_bytes)
+                    file_type = 'pdf'
+                except Exception:
+                    temp_doc = fitz.open(stream=file_bytes)
+                    file_type = 'image'
+            
+            page_count = len(temp_doc)
+            if page_count == 0:
+                temp_doc.close()
+                continue
+            
+            start_page = len(pdf_doc)
+            
+            # Convert to PDF if needed and insert
+            if file_type == 'image':
+                pdf_bytes = temp_doc.convert_to_pdf()
+                temp_pdf = fitz.open('pdf', pdf_bytes)
+                pdf_doc.insert_pdf(temp_pdf)
+                temp_pdf.close()
+            else:
+                pdf_doc.insert_pdf(temp_doc)
+            
+            temp_doc.close()
+            
+            # Record file information
+            self._file_info.append({
+                'file_index': i,
+                'file_type': file_type,
+                'page_count': page_count,
+                'start_page': start_page,
+                'end_page': start_page + page_count - 1
+            })
+        
+        if len(self._file_info) == 0:
+            raise RuntimeError("No valid files were processed")
         
         # Get the final PDF bytes
         self._data_bits = pdf_doc.tobytes()
@@ -330,7 +386,6 @@ class MultiImageDataset(Dataset):
         # Reopen the PDF for processing
         self._raw_fitz = fitz.open('pdf', self._data_bits)
         self._records = [Doc(v) for v in self._raw_fitz]
-        self._raw_data = image_bytes_list
 
     def __len__(self) -> int:
         """The length of the dataset."""
@@ -397,7 +452,55 @@ class MultiImageDataset(Dataset):
     def clone(self):
         """clone this dataset
         """
-        return MultiImageDataset(self._raw_data)
+        return MultiFileDataset(self._raw_data)
+
+    @property
+    def file_info(self) -> list[dict]:
+        """Get information about each file in the dataset.
+        
+        Returns:
+            list[dict]: List of file information dictionaries containing:
+                - file_index: Index of the file in the original input
+                - file_type: 'pdf' or 'image'
+                - page_count: Number of pages in this file
+                - start_page: Starting page index in the combined dataset
+                - end_page: Ending page index in the combined dataset
+        """
+        return self._file_info.copy()
+
+    def get_file_page_count(self, file_index: int) -> int:
+        """Get the page count for a specific file.
+        
+        Args:
+            file_index (int): Index of the file
+            
+        Returns:
+            int: Number of pages in the file
+        """
+        if file_index < 0 or file_index >= len(self._file_info):
+            raise IndexError(f"File index {file_index} out of range")
+        return self._file_info[file_index]['page_count']
+
+    def export_file_as_dataset(self, file_index: int):
+        """Export a specific file as an appropriate Dataset.
+        
+        Args:
+            file_index (int): Index of the file to export
+            
+        Returns:
+            Dataset: ImageDataset for image files, PymuDocDataset for PDF files
+        """
+        if file_index < 0 or file_index >= len(self._file_info):
+            raise IndexError(f"File index {file_index} out of range")
+        
+        file_bytes = self._raw_data[file_index]
+        file_type = self._file_info[file_index]['file_type']
+        
+        if file_type == 'image':
+            return ImageDataset(file_bytes)
+        else:  # file_type == 'pdf'
+            return PymuDocDataset(file_bytes)
+
 
 class Doc(PageableData):
     """Initialized with pymudoc object."""
