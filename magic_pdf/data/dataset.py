@@ -316,6 +316,8 @@ class MultiFileDataset(Dataset):
         
         if file_extensions and len(file_extensions) != len(file_bytes_list):
             raise ValueError("file_extensions length must match file_bytes_list length")
+
+        self._file_extensions = file_extensions
         
         # Track file information
         self._file_info = []
