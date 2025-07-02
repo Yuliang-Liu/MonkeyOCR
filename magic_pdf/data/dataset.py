@@ -452,7 +452,7 @@ class MultiFileDataset(Dataset):
     def clone(self):
         """clone this dataset
         """
-        return MultiFileDataset(self._raw_data)
+        return MultiFileDataset(self._raw_data, file_extensions=self._file_extensions)
 
     @property
     def file_info(self) -> list[dict]:
