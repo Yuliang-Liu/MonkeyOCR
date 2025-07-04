@@ -850,7 +850,7 @@ class MonkeyChat_LMDeploy_queue:
         except Exception as e:
             logger.warning(f"Error during cleanup: {e}")
         
-        logger.info("vLLM Async engine shutdown completed")
+        logger.info("LMDeploy MultiUser engine shutdown completed")
     
     def __del__(self):
         """Destructor"""
