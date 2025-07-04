@@ -8,7 +8,7 @@ layout_config:
   reader:
     name: layoutreader
 chat_config:
-  weight_path: model_weight/Recognition # model_weight/qwen25vl_1b/qwen25vl_save #
+  weight_path: model_weight/Recognition
   backend: lmdeploy # lmdeploy / vllm / transformers / api / lmdeploy_queue / vllm_queue
   batch_size: 10 # active when using `transformers` as backend
   # if using xxx_queue as backend
