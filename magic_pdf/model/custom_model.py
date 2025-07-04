@@ -800,30 +800,6 @@ class MonkeyChat_LMDeploy_queue:
                 "shutdown_flag": self.shutdown_flag
             }
     
-    def get_detailed_status(self):
-        """Get detailed status information (for debugging)"""
-        with self.queue_lock:
-            # Collect unfinished future information
-            pending_futures = {}
-            for req_id, future in self.result_futures.items():
-                pending_futures[req_id] = {
-                    "done": future.done(),
-                    "cancelled": future.cancelled(),
-                    "has_loop": hasattr(future, '_loop') and future._loop is not None
-                }
-            
-            return {
-                "queue_size": len(self.request_queue),
-                "pending_results": len(self.result_futures),
-                "max_queue_size": self.max_queue_size,
-                "processing": self.processing,
-                "processor_thread_alive": self.processor_thread.is_alive(),
-                "shutdown_flag": self.shutdown_flag,
-                "pending_futures": pending_futures,
-                "max_batch_size": self.max_batch_size,
-                "queue_timeout": self.queue_timeout
-            }
-    
     def shutdown(self):
         """Shutdown service"""
         self.shutdown_flag = True
@@ -1188,30 +1164,6 @@ class MonkeyChat_vLLM_queue:
                 "processing": self.processing,
                 "processor_thread_alive": self.processor_thread.is_alive(),
                 "shutdown_flag": self.shutdown_flag
-            }
-    
-    def get_detailed_status(self):
-        """Get detailed status information (for debugging)"""
-        with self.queue_lock:
-            # Collect unfinished future information
-            pending_futures = {}
-            for req_id, future in self.result_futures.items():
-                pending_futures[req_id] = {
-                    "done": future.done(),
-                    "cancelled": future.cancelled(),
-                    "has_loop": hasattr(future, '_loop') and future._loop is not None
-                }
-            
-            return {
-                "queue_size": len(self.request_queue),
-                "pending_results": len(self.result_futures),
-                "max_queue_size": self.max_queue_size,
-                "processing": self.processing,
-                "processor_thread_alive": self.processor_thread.is_alive(),
-                "shutdown_flag": self.shutdown_flag,
-                "pending_futures": pending_futures,
-                "max_batch_size": self.max_batch_size,
-                "queue_timeout": self.queue_timeout
             }
     
     def shutdown(self):
