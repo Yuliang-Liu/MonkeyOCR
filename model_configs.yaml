@@ -8,9 +8,14 @@ layout_config:
   reader:
     name: layoutreader
 chat_config:
-  weight_path: model_weight/Recognition
-  backend: lmdeploy # lmdeploy / vllm / transformers / api
+  weight_path: model_weight/Recognition # model_weight/qwen25vl_1b/qwen25vl_save #
+  backend: lmdeploy # lmdeploy / vllm / transformers / api / lmdeploy_queue / vllm_queue
   batch_size: 10 # active when using `transformers` as backend
+  # if using xxx_queue as backend
+  queue_config:
+    max_batch_size: 256 # maximum batch size for internal processing
+    queue_timeout: 1 # seconds to wait for batching requests
+    max_queue_size: 2000 # maximum requests in queue
 
 # Uncomment the following lines if use `api` as backend 
 # api_config:

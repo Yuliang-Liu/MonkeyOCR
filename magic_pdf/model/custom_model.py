@@ -1,4 +1,5 @@
 import os
+import time
 import torch
 from magic_pdf.config.constants import *
 from magic_pdf.model.sub_modules.model_init import AtomModelSingleton
@@ -11,6 +12,7 @@ from qwen_vl_utils import process_vision_info
 from PIL import Image
 from typing import List, Union
 from openai import OpenAI
+import asyncio
 
 
 class MonkeyOCR:
@@ -105,9 +107,17 @@ class MonkeyOCR:
         if chat_backend == 'lmdeploy':
             logger.info('Use LMDeploy as backend')
             self.chat_model = MonkeyChat_LMDeploy(chat_path)
+        elif chat_backend == 'lmdeploy_queue':
+            logger.info('Use LMDeploy Queue as backend')
+            queue_config = self.chat_config.get('queue_config', {})
+            self.chat_model = MonkeyChat_LMDeploy_queue(chat_path, **queue_config)
         elif chat_backend == 'vllm':
             logger.info('Use vLLM as backend')
             self.chat_model = MonkeyChat_vLLM(chat_path)
+        elif chat_backend == 'vllm_queue':
+            logger.info('Use vLLM Queue as backend')
+            queue_config = self.chat_config.get('queue_config', {})
+            self.chat_model = MonkeyChat_vLLM_queue(chat_path, **queue_config)
         elif chat_backend == 'transformers':
             logger.info('Use transformers as backend')
             batch_size = self.chat_config.get('batch_size', 5)
@@ -453,3 +463,788 @@ class MonkeyChat_OpenAIAPI:
             except Exception as e:
                 results.append(f"Error: {e}")
         return results
+
+class MonkeyChat_LMDeploy_queue:
+    """
+    Hybrid architecture: Combines synchronous batch processing with asynchronous concurrency for LMDeploy
+    Designed for multi-user large-batch concurrent inference scenarios using LMDeploy backend
+    
+    Features:
+    1. Uses request queue to collect requests from multiple users
+    2. Dynamic batch merging to maximize GPU utilization
+    3. Supports multi-user concurrency, each user can submit large batch tasks
+    4. Achieves inference speed close to MonkeyChat_LMDeploy
+    5. Uses LMDeploy's efficient pipeline for batch processing
+    """
+    
+    def __init__(self, model_path, max_batch_size=32, queue_timeout=0.1, max_queue_size=1000, engine_config=None):
+        try:
+            from lmdeploy import pipeline, GenerationConfig, PytorchEngineConfig, ChatTemplateConfig
+            import asyncio
+            import threading
+            from collections import deque
+        except ImportError:
+            raise ImportError("LMDeploy is not installed. Please install it following: "
+                              "https://github.com/Yuliang-Liu/MonkeyOCR/blob/main/docs/install_cuda.md")
+        
+        self.model_name = os.path.basename(model_path)
+        self.max_batch_size = max_batch_size
+        self.queue_timeout = queue_timeout
+        self.max_queue_size = max_queue_size
+        
+        # Clear GPU memory before initialization
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+        
+        # Initialize LMDeploy pipeline (for efficient batch processing)
+        self.engine_config = self._auto_config_dtype(engine_config, PytorchEngineConfig)
+        self.pipe = pipeline(
+            model_path, 
+            backend_config=self.engine_config, 
+            chat_template_config=ChatTemplateConfig('qwen2d5-vl')
+        )
+        
+        self.gen_config = GenerationConfig(
+            max_new_tokens=4096,
+            do_sample=True,
+            temperature=0,
+            repetition_penalty=1.05
+        )
+        
+        # Request queue and processing related
+        self.request_queue = deque()
+        self.result_futures = {}
+        self.queue_lock = threading.Lock()
+        self.processing = False
+        self.shutdown_flag = False
+        
+        # Start background processing thread
+        self.processor_thread = threading.Thread(target=self._background_processor, daemon=True)
+        self.processor_thread.start()
+        
+        logger.info(f"LMDeploy MultiUser engine initialized for model: {self.model_name}")
+        logger.info(f"Max batch size: {max_batch_size}, Queue timeout: {queue_timeout}s")
+    
+    def _auto_config_dtype(self, engine_config=None, PytorchEngineConfig=None):
+        """Auto configure dtype based on GPU capability"""
+        if engine_config is None:
+            engine_config = PytorchEngineConfig(session_len=10240)
+        dtype = "bfloat16"
+        if torch.cuda.is_available():
+            device = torch.cuda.current_device()
+            capability = torch.cuda.get_device_capability(device)
+            sm_version = capability[0] * 10 + capability[1]  # e.g. sm75 = 7.5
+            
+            # use float16 if computing capability <= sm75 (7.5)
+            if sm_version <= 75:
+                dtype = "float16"
+        engine_config.dtype = dtype
+        return engine_config
+    
+    def _background_processor(self):
+        """Background thread: continuously process request queue"""
+        import time
+        
+        while not self.shutdown_flag:
+            try:
+                # Collect a batch of requests
+                batch_requests = self._collect_batch_requests()
+                
+                if batch_requests:
+                    # Process batch requests
+                    self._process_batch_requests(batch_requests)
+                else:
+                    # Sleep briefly when no requests
+                    time.sleep(0.01)
+                    
+            except Exception as e:
+                logger.error(f"Background processor error: {e}")
+                time.sleep(0.1)
+    
+    def _collect_batch_requests(self):
+        """Collect a batch of requests, supports dynamic batch size"""
+        import time
+        
+        batch_requests = []
+        start_time = time.time()
+        
+        with self.queue_lock:
+            # Collect requests until batch size reached or timeout
+            while (len(batch_requests) < self.max_batch_size and 
+                   time.time() - start_time < self.queue_timeout and
+                   self.request_queue):
+                
+                request = self.request_queue.popleft()
+                batch_requests.append(request)
+        
+        return batch_requests
+    
+    def _process_batch_requests(self, batch_requests):
+        """Process batch requests using LMDeploy pipeline"""
+        try:
+            # Prepare batch inputs for LMDeploy
+            inputs = []
+            request_ids = []
+            
+            for request in batch_requests:
+                request_id, image_path, question, future = request
+                
+                # Load image and prepare input tuple for LMDeploy
+                image = load_image(image_path, max_size=1600)
+                inputs.append((question, image))
+                request_ids.append(request_id)
+            
+            # Batch inference using LMDeploy pipeline
+            start_time = time.time()
+            outputs = self.pipe(inputs, gen_config=self.gen_config)
+            processing_time = time.time() - start_time
+            
+            logger.info(f"Processed batch of {len(batch_requests)} requests in {processing_time:.2f}s "
+                       f"({len(batch_requests)/processing_time:.1f} req/s)")
+            
+            # Distribute results to corresponding futures
+            for i, output in enumerate(outputs):
+                request_id = request_ids[i]
+                result_text = output.text
+                
+                # Get corresponding future from batch_requests and set result
+                request = batch_requests[i]
+                _, _, _, future = request
+                
+                try:
+                    if not future.done():
+                        # Need to set future result in correct event loop
+                        if hasattr(future, '_loop') and future._loop is not None:
+                            future._loop.call_soon_threadsafe(future.set_result, result_text)
+                        else:
+                            future.set_result(result_text)
+                    
+                    # Clean from dictionary
+                    if request_id in self.result_futures:
+                        del self.result_futures[request_id]
+                        
+                except Exception as e:
+                    logger.error(f"Failed to set result for request {request_id}: {e}")
+                    # Try to set error result
+                    try:
+                        if not future.done():
+                            if hasattr(future, '_loop') and future._loop is not None:
+                                future._loop.call_soon_threadsafe(future.set_result, f"Error: {str(e)}")
+                            else:
+                                future.set_result(f"Error: {str(e)}")
+                    except Exception:
+                        pass
+                    
+        except Exception as e:
+            logger.error(f"Batch processing failed: {e}")
+            # Set all requests to error state
+            for i, request in enumerate(batch_requests):
+                request_id, _, _, future = request
+                
+                try:
+                    if not future.done():
+                        error_msg = f"Error: {str(e)}"
+                        if hasattr(future, '_loop') and future._loop is not None:
+                            future._loop.call_soon_threadsafe(future.set_result, error_msg)
+                        else:
+                            future.set_result(error_msg)
+                    
+                    # Clean from dictionary
+                    if request_id in self.result_futures:
+                        del self.result_futures[request_id]
+                        
+                except Exception as set_error:
+                    logger.error(f"Failed to set error result for request {request_id}: {set_error}")
+    
+    async def async_single_inference(self, image: str, question: str) -> str:
+        """Asynchronous single inference"""
+        import asyncio
+        import concurrent.futures
+        import uuid
+        
+        request_id = f"lmdeploy_multiuser_{uuid.uuid4().hex[:8]}"
+        
+        # Create future to receive result
+        loop = asyncio.get_event_loop()
+        future = loop.create_future()
+        
+        # Add request to queue
+        with self.queue_lock:
+            if len(self.request_queue) >= self.max_queue_size:
+                logger.warning(f"Request queue full, rejecting request {request_id}")
+                return "Error: Request queue full"
+            
+            self.request_queue.append((request_id, image, question, future))
+            self.result_futures[request_id] = future
+        
+        try:
+            # Wait for result with timeout
+            result = await asyncio.wait_for(future, timeout=300)
+            return result
+        except asyncio.TimeoutError:
+            logger.error(f"Request {request_id} timed out")
+            # Clean up timed out request
+            with self.queue_lock:
+                if request_id in self.result_futures:
+                    del self.result_futures[request_id]
+            return "Error: Request timeout"
+        except asyncio.CancelledError:
+            logger.info(f"Request {request_id} was cancelled")
+            # Clean up cancelled request
+            with self.queue_lock:
+                if request_id in self.result_futures:
+                    del self.result_futures[request_id]
+            raise
+        except Exception as e:
+            logger.error(f"Request {request_id} failed with exception: {e}")
+            # Clean up failed request
+            with self.queue_lock:
+                if request_id in self.result_futures:
+                    del self.result_futures[request_id]
+            return f"Error: {str(e)}"
+    
+    def single_inference(self, image: str, question: str) -> str:
+        """Synchronous single inference (wraps async method)"""
+        try:
+            try:
+                loop = asyncio.get_running_loop()
+                # Already in async context, use thread executor
+                import concurrent.futures
+                
+                def run_async_in_thread():
+                    new_loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(new_loop)
+                    try:
+                        return new_loop.run_until_complete(
+                            self.async_single_inference(image, question)
+                        )
+                    finally:
+                        new_loop.close()
+                
+                with concurrent.futures.ThreadPoolExecutor() as executor:
+                    future = executor.submit(run_async_in_thread)
+                    return future.result(timeout=300)
+                    
+            except RuntimeError:
+                # No running event loop
+                return asyncio.run(self.async_single_inference(image, question))
+                
+        except Exception as e:
+            logger.error(f"Single inference failed: {e}")
+            return f"Error: {str(e)}"
+    
+    async def async_batch_inference(self, images: List[str], questions: List[str]) -> List[str]:
+        """Asynchronous batch inference (decompose large batches into multiple concurrent requests)"""
+        if len(images) != len(questions):
+            raise ValueError("Images and questions must have the same length")
+        
+        # Create concurrent tasks
+        tasks = []
+        for image, question in zip(images, questions):
+            task = self.async_single_inference(image, question)
+            tasks.append(task)
+        
+        # Execute all tasks concurrently
+        logger.info(f"Processing {len(tasks)} requests concurrently")
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+        
+        # Handle exception results
+        processed_results = []
+        for result in results:
+            if isinstance(result, Exception):
+                processed_results.append(f"Error: {str(result)}")
+            else:
+                processed_results.append(result)
+        
+        return processed_results
+    
+    def batch_inference(self, images: List[str], questions: List[str]) -> List[str]:
+        """Synchronous batch inference"""
+        try:
+            try:
+                loop = asyncio.get_running_loop()
+                # Already in async context
+                import concurrent.futures
+                
+                def run_async_in_thread():
+                    new_loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(new_loop)
+                    try:
+                        return new_loop.run_until_complete(
+                            self.async_batch_inference(images, questions)
+                        )
+                    finally:
+                        new_loop.close()
+                
+                with concurrent.futures.ThreadPoolExecutor() as executor:
+                    future = executor.submit(run_async_in_thread)
+                    return future.result(timeout=600)
+                    
+            except RuntimeError:
+                # No running event loop
+                return asyncio.run(self.async_batch_inference(images, questions))
+                
+        except Exception as e:
+            logger.error(f"Batch inference failed: {e}")
+            return [f"Error: {str(e)}"] * len(images)
+    
+    def get_queue_status(self):
+        """Get queue status (for monitoring)"""
+        with self.queue_lock:
+            return {
+                "queue_size": len(self.request_queue),
+                "pending_results": len(self.result_futures),
+                "max_queue_size": self.max_queue_size,
+                "processing": self.processing,
+                "processor_thread_alive": self.processor_thread.is_alive(),
+                "shutdown_flag": self.shutdown_flag
+            }
+    
+    def get_detailed_status(self):
+        """Get detailed status information (for debugging)"""
+        with self.queue_lock:
+            # Collect unfinished future information
+            pending_futures = {}
+            for req_id, future in self.result_futures.items():
+                pending_futures[req_id] = {
+                    "done": future.done(),
+                    "cancelled": future.cancelled(),
+                    "has_loop": hasattr(future, '_loop') and future._loop is not None
+                }
+            
+            return {
+                "queue_size": len(self.request_queue),
+                "pending_results": len(self.result_futures),
+                "max_queue_size": self.max_queue_size,
+                "processing": self.processing,
+                "processor_thread_alive": self.processor_thread.is_alive(),
+                "shutdown_flag": self.shutdown_flag,
+                "pending_futures": pending_futures,
+                "max_batch_size": self.max_batch_size,
+                "queue_timeout": self.queue_timeout
+            }
+    
+    def shutdown(self):
+        """Shutdown service"""
+        self.shutdown_flag = True
+        
+        # Wait for background thread to finish
+        if self.processor_thread.is_alive():
+            self.processor_thread.join(timeout=5)
+        
+        # Clean up unfinished requests
+        with self.queue_lock:
+            for request_id, future in self.result_futures.items():
+                if not future.done():
+                    future.set_result("Error: Service shutdown")
+            self.result_futures.clear()
+            self.request_queue.clear()
+        
+        # Clean up pipeline and GPU memory
+        try:
+            if hasattr(self, 'pipe') and self.pipe is not None:
+                del self.pipe
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+                torch.cuda.synchronize()
+        except Exception as e:
+            logger.warning(f"Error during cleanup: {e}")
+        
+        logger.info("vLLM Async engine shutdown completed")
+    
+    def __del__(self):
+        """Destructor"""
+        try:
+            self.shutdown()
+        except Exception:
+            pass
+
+class MonkeyChat_vLLM_queue:
+    """
+    Hybrid architecture: Combines synchronous batch processing with asynchronous concurrency
+    Designed for multi-user large-batch concurrent inference scenarios
+    
+    Features:
+    1. Uses request queue to collect requests from multiple users
+    2. Dynamic batch merging to maximize GPU utilization
+    3. Supports multi-user concurrency, each user can submit large batch tasks
+    4. Achieves inference speed close to MonkeyChat_vLLM
+    """
+    
+    def __init__(self, model_path, max_batch_size=64, queue_timeout=0.1, max_queue_size=1000):
+        try:
+            from vllm import LLM, SamplingParams
+            import asyncio
+            import threading
+            from collections import deque
+        except ImportError:
+            raise ImportError("vLLM is not installed. Please install it following: "
+                              "https://github.com/Yuliang-Liu/MonkeyOCR/blob/main/docs/install_cuda.md")
+        
+        self.model_name = os.path.basename(model_path)
+        self.max_batch_size = max_batch_size
+        self.queue_timeout = queue_timeout
+        self.max_queue_size = max_queue_size
+        
+        # Initialize synchronous vLLM engine (for efficient batch processing)
+        self.engine = LLM(
+            model=model_path,
+            max_seq_len_to_capture=10240,
+            mm_processor_kwargs={'use_fast': True},
+            gpu_memory_utilization=self._auto_gpu_mem_ratio(0.9),
+            max_num_seqs=max_batch_size * 2,  # Allow larger sequence numbers
+        )
+        
+        self.gen_config = SamplingParams(
+            max_tokens=4096, 
+            temperature=0, 
+            repetition_penalty=1.05
+        )
+        
+        # Request queue and processing related
+        self.request_queue = deque()
+        self.result_futures = {}
+        self.queue_lock = threading.Lock()
+        self.processing = False
+        self.shutdown_flag = False
+        
+        # Start background processing thread
+        self.processor_thread = threading.Thread(target=self._background_processor, daemon=True)
+        self.processor_thread.start()
+        
+        logger.info(f"vLLM MultiUser engine initialized for model: {self.model_name}")
+        logger.info(f"Max batch size: {max_batch_size}, Queue timeout: {queue_timeout}s")
+    
+    def _auto_gpu_mem_ratio(self, ratio):
+        mem_free, mem_total = torch.cuda.mem_get_info()
+        ratio = ratio * mem_free / mem_total
+        return ratio
+    
+    def _background_processor(self):
+        """Background thread: continuously process request queue"""
+        import time
+        
+        while not self.shutdown_flag:
+            try:
+                # Collect a batch of requests
+                batch_requests = self._collect_batch_requests()
+                
+                if batch_requests:
+                    # Process batch requests
+                    self._process_batch_requests(batch_requests)
+                else:
+                    # Sleep briefly when no requests
+                    time.sleep(0.01)
+                    
+            except Exception as e:
+                logger.error(f"Background processor error: {e}")
+                time.sleep(0.1)
+    
+    def _collect_batch_requests(self):
+        """Collect a batch of requests, supports dynamic batch size"""
+        import time
+        
+        batch_requests = []
+        start_time = time.time()
+        
+        with self.queue_lock:
+            # Collect requests until batch size reached or timeout
+            while (len(batch_requests) < self.max_batch_size and 
+                   time.time() - start_time < self.queue_timeout and
+                   self.request_queue):
+                
+                request = self.request_queue.popleft()
+                batch_requests.append(request)
+        
+        return batch_requests
+    
+    def _process_batch_requests(self, batch_requests):
+        """Process batch requests using synchronous engine"""
+        try:
+            # Prepare batch inputs
+            placeholder = "<|image_pad|>"
+            inputs = []
+            request_ids = []
+            
+            for request in batch_requests:
+                request_id, image_path, question, future = request
+                
+                prompt = (
+                    "<|im_start|>system\nYou are a helpful assistant.<|im_end|>\n"
+                    f"<|im_start|>user\n<|vision_start|>{placeholder}<|vision_end|>"
+                    f"{question}<|im_end|>\n"
+                    "<|im_start|>assistant\n"
+                )
+                
+                inputs.append({
+                    "prompt": prompt,
+                    "multi_modal_data": {
+                        "image": load_image(image_path, max_size=1600),
+                    }
+                })
+                request_ids.append(request_id)
+            
+            # Batch inference (using high-efficiency batch processing of synchronous engine)
+            start_time = time.time()
+            outputs = self.engine.generate(inputs, sampling_params=self.gen_config)
+            processing_time = time.time() - start_time
+            
+            logger.info(f"Processed batch of {len(batch_requests)} requests in {processing_time:.2f}s "
+                       f"({len(batch_requests)/processing_time:.1f} req/s)")
+            
+            # Distribute results to corresponding futures
+            for i, output in enumerate(outputs):
+                request_id = request_ids[i]
+                result_text = output.outputs[0].text
+                
+                # Get corresponding future from batch_requests and set result
+                request = batch_requests[i]
+                _, _, _, future = request
+                
+                try:
+                    if not future.done():
+                        # Need to set future result in correct event loop
+                        if hasattr(future, '_loop') and future._loop is not None:
+                            future._loop.call_soon_threadsafe(future.set_result, result_text)
+                        else:
+                            future.set_result(result_text)
+                    
+                    # Clean from dictionary
+                    if request_id in self.result_futures:
+                        del self.result_futures[request_id]
+                        
+                except Exception as e:
+                    logger.error(f"Failed to set result for request {request_id}: {e}")
+                    # Try to set error result
+                    try:
+                        if not future.done():
+                            if hasattr(future, '_loop') and future._loop is not None:
+                                future._loop.call_soon_threadsafe(future.set_result, f"Error: {str(e)}")
+                            else:
+                                future.set_result(f"Error: {str(e)}")
+                    except Exception:
+                        pass
+                    
+        except Exception as e:
+            logger.error(f"Batch processing failed: {e}")
+            # Set all requests to error state
+            for i, request in enumerate(batch_requests):
+                request_id, _, _, future = request
+                
+                try:
+                    if not future.done():
+                        error_msg = f"Error: {str(e)}"
+                        if hasattr(future, '_loop') and future._loop is not None:
+                            future._loop.call_soon_threadsafe(future.set_result, error_msg)
+                        else:
+                            future.set_result(error_msg)
+                    
+                    # Clean from dictionary
+                    if request_id in self.result_futures:
+                        del self.result_futures[request_id]
+                        
+                except Exception as set_error:
+                    logger.error(f"Failed to set error result for request {request_id}: {set_error}")
+                
+    async def async_single_inference(self, image: str, question: str) -> str:
+        """Asynchronous single inference"""
+        import asyncio
+        import concurrent.futures
+        import uuid
+        
+        request_id = f"vllm_multiuser_{uuid.uuid4().hex[:8]}"
+        
+        # Create future to receive result
+        loop = asyncio.get_event_loop()
+        future = loop.create_future()
+        
+        # Add request to queue
+        with self.queue_lock:
+            if len(self.request_queue) >= self.max_queue_size:
+                logger.warning(f"Request queue full, rejecting request {request_id}")
+                return "Error: Request queue full"
+            
+            self.request_queue.append((request_id, image, question, future))
+            self.result_futures[request_id] = future
+        
+        try:
+            # Wait for result with timeout
+            result = await asyncio.wait_for(future, timeout=300)
+            return result
+        except asyncio.TimeoutError:
+            logger.error(f"Request {request_id} timed out")
+            # Clean up timed out request
+            with self.queue_lock:
+                if request_id in self.result_futures:
+                    del self.result_futures[request_id]
+            return "Error: Request timeout"
+        except asyncio.CancelledError:
+            logger.info(f"Request {request_id} was cancelled")
+            # Clean up cancelled request
+            with self.queue_lock:
+                if request_id in self.result_futures:
+                    del self.result_futures[request_id]
+            raise
+        except Exception as e:
+            logger.error(f"Request {request_id} failed with exception: {e}")
+            # Clean up failed request
+            with self.queue_lock:
+                if request_id in self.result_futures:
+                    del self.result_futures[request_id]
+            return f"Error: {str(e)}"
+    
+    def single_inference(self, image: str, question: str) -> str:
+        """Synchronous single inference (wraps async method)"""
+        try:
+            try:
+                loop = asyncio.get_running_loop()
+                # Already in async context, use thread executor
+                import concurrent.futures
+                
+                def run_async_in_thread():
+                    new_loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(new_loop)
+                    try:
+                        return new_loop.run_until_complete(
+                            self.async_single_inference(image, question)
+                        )
+                    finally:
+                        new_loop.close()
+                
+                with concurrent.futures.ThreadPoolExecutor() as executor:
+                    future = executor.submit(run_async_in_thread)
+                    return future.result(timeout=300)
+                    
+            except RuntimeError:
+                # No running event loop
+                return asyncio.run(self.async_single_inference(image, question))
+                
+        except Exception as e:
+            logger.error(f"Single inference failed: {e}")
+            return f"Error: {str(e)}"
+    
+    async def async_batch_inference(self, images: List[str], questions: List[str]) -> List[str]:
+        """Asynchronous batch inference (decompose large batches into multiple concurrent requests)"""
+        if len(images) != len(questions):
+            raise ValueError("Images and questions must have the same length")
+        
+        # Create concurrent tasks
+        tasks = []
+        for image, question in zip(images, questions):
+            task = self.async_single_inference(image, question)
+            tasks.append(task)
+        
+        # Execute all tasks concurrently
+        logger.info(f"Processing {len(tasks)} requests concurrently")
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+        
+        # Handle exception results
+        processed_results = []
+        for result in results:
+            if isinstance(result, Exception):
+                processed_results.append(f"Error: {str(result)}")
+            else:
+                processed_results.append(result)
+        
+        return processed_results
+    
+    def batch_inference(self, images: List[str], questions: List[str]) -> List[str]:
+        """Synchronous batch inference"""
+        try:
+            try:
+                loop = asyncio.get_running_loop()
+                # Already in async context
+                import concurrent.futures
+                
+                def run_async_in_thread():
+                    new_loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(new_loop)
+                    try:
+                        return new_loop.run_until_complete(
+                            self.async_batch_inference(images, questions)
+                        )
+                    finally:
+                        new_loop.close()
+                
+                with concurrent.futures.ThreadPoolExecutor() as executor:
+                    future = executor.submit(run_async_in_thread)
+                    return future.result(timeout=600)
+                    
+            except RuntimeError:
+                # No running event loop
+                return asyncio.run(self.async_batch_inference(images, questions))
+                
+        except Exception as e:
+            logger.error(f"Batch inference failed: {e}")
+            return [f"Error: {str(e)}"] * len(images)
+    
+    def get_queue_status(self):
+        """Get queue status (for monitoring)"""
+        with self.queue_lock:
+            return {
+                "queue_size": len(self.request_queue),
+                "pending_results": len(self.result_futures),
+                "max_queue_size": self.max_queue_size,
+                "processing": self.processing,
+                "processor_thread_alive": self.processor_thread.is_alive(),
+                "shutdown_flag": self.shutdown_flag
+            }
+    
+    def get_detailed_status(self):
+        """Get detailed status information (for debugging)"""
+        with self.queue_lock:
+            # Collect unfinished future information
+            pending_futures = {}
+            for req_id, future in self.result_futures.items():
+                pending_futures[req_id] = {
+                    "done": future.done(),
+                    "cancelled": future.cancelled(),
+                    "has_loop": hasattr(future, '_loop') and future._loop is not None
+                }
+            
+            return {
+                "queue_size": len(self.request_queue),
+                "pending_results": len(self.result_futures),
+                "max_queue_size": self.max_queue_size,
+                "processing": self.processing,
+                "processor_thread_alive": self.processor_thread.is_alive(),
+                "shutdown_flag": self.shutdown_flag,
+                "pending_futures": pending_futures,
+                "max_batch_size": self.max_batch_size,
+                "queue_timeout": self.queue_timeout
+            }
+    
+    def shutdown(self):
+        """Shutdown service"""
+        self.shutdown_flag = True
+        
+        # Wait for background thread to finish
+        if self.processor_thread.is_alive():
+            self.processor_thread.join(timeout=5)
+        
+        # Clean up unfinished requests
+        with self.queue_lock:
+            for request_id, future in self.result_futures.items():
+                if not future.done():
+                    future.set_result("Error: Service shutdown")
+            self.result_futures.clear()
+            self.request_queue.clear()
+        
+        # Clean up engine and GPU memory
+        try:
+            if hasattr(self, 'engine') and self.engine is not None:
+                del self.engine
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+                torch.cuda.synchronize()
+        except Exception as e:
+            logger.warning(f"Error during cleanup: {e}")
+        
+        logger.info("vLLM MultiUser engine shutdown completed")
+    
+    def __del__(self):
+        """Destructor"""
+        try:
+            self.shutdown()
+        except Exception:
+            pass
