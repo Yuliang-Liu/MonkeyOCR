@@ -64,8 +64,10 @@ class BatchAnalyzeLLM:
 
         clean_vram(self.model.device, vram_threshold=8)
 
+        llm_ocr_start = time.time()
+        logger.info('VLM OCR start...')
         # Check if split_pages is True and handle pages without valid cids
-        if split_pages:
+        if split_pages or len(images) == 1:
             cid2instruction = [0, 1, 4, 5, 6, 7, 8, 14, 101]
             
             pages_to_process_directly = []
@@ -107,7 +109,6 @@ class BatchAnalyzeLLM:
                     }
                     images_layout_res[page_idx] = [pre_res, single_res]
 
-        llm_ocr_start = time.time()
         new_images_all = []
         cids_all = []
         page_idxs = []
@@ -125,7 +126,6 @@ class BatchAnalyzeLLM:
             new_images_all.extend(new_images)
             cids_all.extend(cids)
             page_idxs.append(len(new_images_all) - len(new_images))
-        logger.info('VLM OCR start...')
         ocr_result = self.batch_llm_ocr(new_images_all, cids_all)
         for index in range(len(images)):
             ocr_results = []
@@ -161,7 +161,7 @@ class BatchAnalyzeLLM:
 
         return images_layout_res
 
-    def batch_llm_ocr(self, images, cat_ids, version='lmdeploy',max_batch_size=8):
+    def batch_llm_ocr(self, images, cat_ids, version='lmdeploy'):
         import re
         def sanitize_md(output):
             cleaned = re.match(r'<md>.*</md>', output, flags=re.DOTALL)
@@ -207,6 +207,8 @@ class BatchAnalyzeLLM:
                     continue
                 new_images.append(images[i])
                 messages.append(cid2instruction[cat_ids[i]])
+            if len(new_images) == 0:
+                return [''] * len(images)
             out = self.model.chat_model.batch_inference(new_images, messages)
             outs.extend(out)
         else:
