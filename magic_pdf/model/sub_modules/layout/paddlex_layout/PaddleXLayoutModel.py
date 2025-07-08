@@ -1,6 +1,7 @@
 import numpy as np
 from PIL import Image
 from typing import List, Union
+from loguru import logger
 
 from magic_pdf.config.ocr_content_type import CategoryId
 
@@ -11,10 +12,16 @@ except ImportError:
 
 
 class PaddleXLayoutModelWrapper:
-    def __init__(self, model_name: str, device: str):
+    def __init__(self, model_name: str, device: str, model_dir: str = None):
         self.model_name = model_name
         self.device = device  # Note: Device may not be directly used by paddlex.create_model
-        self.model = create_model(model_name=self.model_name)
+        logger.info(f"Loading {self.model_name} model from {model_dir}...")
+        if model_dir is not None:
+            self.model_dir = model_dir
+            self.model = create_model(model_name=self.model_name, model_dir=self.model_dir)
+        else:
+            self.model = create_model(model_name=self.model_name)
+
         self.category_mapping = {
             "paragraph_title": CategoryId.Title,
             "image": CategoryId.ImageBody,

@@ -4,6 +4,7 @@ from loguru import logger
 from magic_pdf.config.constants import MODEL_NAME
 from magic_pdf.model.model_list import AtomicModel
 
+
 def doclayout_yolo_model_init(weight, device='cpu'):
     from magic_pdf.model.sub_modules.layout.doclayout_yolo.DocLayoutYOLO import \
         DocLayoutYOLOModel
@@ -12,11 +13,13 @@ def doclayout_yolo_model_init(weight, device='cpu'):
     model = DocLayoutYOLOModel(weight, device)
     return model
 
-def paddex_layout_model_init(model_name: str, device: str):
+
+def paddex_layout_model_init(device: str, model_dir: str = None):
     from magic_pdf.model.sub_modules.layout.paddlex_layout.PaddleXLayoutModel import \
         PaddleXLayoutModelWrapper
-    model = PaddleXLayoutModelWrapper(model_name=model_name, device=device)
+    model = PaddleXLayoutModelWrapper(model_name=MODEL_NAME.PaddleXLayoutModel, device=device, model_dir=model_dir)
     return model
+
 
 class AtomModelSingleton:
     _instance = None
@@ -40,6 +43,7 @@ class AtomModelSingleton:
             self._models[key] = atom_model_init(model_name=atom_model_name, **kwargs)
         return self._models[key]
 
+
 def atom_model_init(model_name: str, **kwargs):
     atom_model = None
     if model_name == AtomicModel.Layout:
@@ -50,7 +54,7 @@ def atom_model_init(model_name: str, **kwargs):
             )
         elif kwargs.get('layout_model_name') == MODEL_NAME.PaddleXLayoutModel:
             atom_model = paddex_layout_model_init(
-                model_name=kwargs.get('paddlex_model_name'),
+                model_dir=kwargs.get('paddlexlayout_model_dir'),
                 device=kwargs.get('device')
             )
         else:

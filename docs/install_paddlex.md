@@ -37,4 +37,17 @@ Update the `model` field in the [`model_configs.yaml`](https://github.com/Yulian
 layout_config: 
   model: PP-DocLayout_plus-L # PP-DocLayout_plus-L / doclayout_yolo
 ```
-> 💡 Note: The model weights will be downloaded automatically the first time you run the program.  No manual download is required.
+
+Model weights will be automatically downloaded to the default Hugging Face path the first time you run the program.
+
+To manually download and store PP-DocLayout_plus-L weight files in your configured models_dir directory, execute the following procedure:
+
+1. Download PP-DocLayout_plus-L weights to your local `models_dir` directory
+2. Add the following configuration to your [`model_configs.yaml`](https://github.com/Yuliang-Liu/MonkeyOCR/blob/main/model_configs.yaml) file:
+```yaml
+weights:
+  PP-DocLayout_plus-L: Structure/PP-DocLayout_plus-L # The relative path of models_dir
+
+layout_config: 
+  model: PP-DocLayout_plus-L # PP-DocLayout_plus-L / doclayout_yolo
+```

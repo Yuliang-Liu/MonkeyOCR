@@ -67,10 +67,13 @@ class MonkeyOCR:
                 device=self.device,
             )
         elif self.layout_model_name == MODEL_NAME.PaddleXLayoutModel:
+            layout_model_path = None
+            if self.layout_model_name in self.configs['weights']:
+                layout_model_path = os.path.join(models_dir, self.configs['weights'][self.layout_model_name])
             self.layout_model = atom_model_manager.get_atom_model(
                 atom_model_name=AtomicModel.Layout,
                 layout_model_name=MODEL_NAME.PaddleXLayoutModel,
-                paddlex_model_name=MODEL_NAME.PaddleXLayoutModel,
+                paddlexlayout_model_dir=layout_model_path,
                 device=self.device,
             )
         logger.info(f'layout model loaded: {self.layout_model_name}')
