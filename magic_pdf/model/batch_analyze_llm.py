@@ -16,7 +16,7 @@ class BatchAnalyzeLLM:
     def __init__(self, model):
         self.model = model
 
-    def __call__(self, images: list, split_pages: bool = False) -> list:
+    def __call__(self, images: list, split_pages: bool = False, pred_abandon: bool = False) -> list:
         images_layout_res = []
 
         layout_start_time = time.time()
@@ -61,6 +61,13 @@ class BatchAnalyzeLLM:
         logger.info(
             f'layout time: {round(time.time() - layout_start_time, 2)}, image num: {len(images)}'
         )
+
+        if pred_abandon:
+            for index in range(len(images)):
+                layout_res = images_layout_res[index]
+                for res in layout_res:
+                    if res['category_id'] == 2:
+                        res['category_id'] = 1
 
         clean_vram(self.model.device, vram_threshold=8)
 

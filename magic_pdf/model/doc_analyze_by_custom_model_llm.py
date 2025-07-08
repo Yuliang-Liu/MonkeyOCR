@@ -16,6 +16,7 @@ def doc_analyze_llm(
     end_page_id=None,
     split_pages=False,
     split_files=False,
+    pred_abandon=False,
 ) -> InferenceResultLLM:
 
     end_page_id = end_page_id if end_page_id else len(dataset) - 1
@@ -33,7 +34,7 @@ def doc_analyze_llm(
             page_data = dataset.get_page(index)
             img_dict = page_data.get_image()
             images.append(img_dict['img'])
-    analyze_result = batch_model(images, split_pages=split_pages or split_files)
+    analyze_result = batch_model(images, split_pages=split_pages or split_files, pred_abandon=pred_abandon)
 
     # Handle MultiFileDataset with split_files
     if split_files and isinstance(dataset, MultiFileDataset):
