@@ -676,7 +676,7 @@ Usage examples:
     parser.add_argument(
         "--pred-abandon",
         action='store_true',
-        help="Enable predicting abandon element like footer and header (default: False)"
+        help="Enable predicting abandon elements like footer and header (default: False)"
     )
     
     args = parser.parse_args()
