@@ -210,29 +210,8 @@ Once the API service is running, you can access the API documentation at http://
    Once the API service is running, you can access the API documentation at http://localhost:7861/docs to explore available endpoints.
 
 ## Windows Support 
-See the [installation guide](https://github.com/Yuliang-Liu/MonkeyOCR/blob/main/docs/install_cuda.md#install-with-cuda-support) to set up your environment.
-Download our model from Huggingface.
-```python
-pip install huggingface_hub
 
-python tools/download_model.py
-```
-You can also download our model from ModelScope.
-
-```python
-pip install modelscope
-
-python tools/download_model.py -t modelscope
-```
-Copy and run the following command.
-```
-pip install -U "triton-windows<3.4"
-```
-Then you can run MonkeyOCR normally.
-
-If you encounter the error `RuntimeError: No enough gpu memory for runtime.`, it indicates insufficient VRAM. You can try quantizing the model. For details, see the following Quantization Method.
-
-You can alse use WSL and Docker Desktop. See the [Windows Support](docs/windows_support.md) Guide for details.
+See the [Windows Support](docs/windows_support.md) Guide for details.
 
 ## Quantization
 
