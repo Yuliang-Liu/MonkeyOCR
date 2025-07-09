@@ -1,6 +1,6 @@
 # PP-DocLayout_plus-L Usage Guide
 
-We have added support for the [PP-DocLayout_plus-L](https://huggingface.co/PaddlePaddle/PP-DocLayout-L) model, which offers improved performance over `doclayout_yolo`.
+We have added support for the [PP-DocLayout_plus-L](https://huggingface.co/PaddlePaddle/PP-DocLayout_plus-L) model, which offers improved performance over `doclayout_yolo`.
 
 This guide will walk you through the necessary steps to use the new model.
 
