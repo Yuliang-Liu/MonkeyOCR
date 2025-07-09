@@ -1,6 +1,35 @@
-# Running with WSL2 + Docker Desktop
+# Windows Support
+For Windows users, we provide three methods to run MonkeyOCR:
+1. Natively on Windows
+2. Using Windows Subsystem for Linux (WSL)
+3. Using WSL with Docker
 
-## Installing WSL2 and Docker Desktop
+## Native Windows Support
+Follow the [installation guide](https://github.com/Yuliang-Liu/MonkeyOCR/blob/main/docs/install_cuda.md#install-with-cuda-support) to set up your environment.
+Download our model from Huggingface.
+```python
+pip install huggingface_hub
+
+python tools/download_model.py
+```
+You can also download our model from ModelScope.
+
+```python
+pip install modelscope
+
+python tools/download_model.py -t modelscope
+```
+Copy and run the following command.
+```
+pip install -U "triton-windows<3.4"
+```
+Then you can run MonkeyOCR normally.
+
+
+
+## Running with WSL2 Or WSL2 + Docker Desktop
+
+## Installing WSL2
 
 First, ensure your version of Windows supports WSL2.
 
@@ -37,6 +66,12 @@ First, ensure your version of Windows supports WSL2.
     memory=24GB
     ```
     Other parameters can be set as needed.
+5. Enter WSL.
+    ```PowerShell
+    wsl
+    cd ~
+    ```
+If you are only using the WSL method, after you enter the WSL terminal and have installed conda, you can then follow the [installation guide](https://github.com/Yuliang-Liu/MonkeyOCR/blob/main/docs/install_cuda.md#install-with-cuda-support) to set up your environment.
 
 ## Building the Container
 1. Run Docker Desktop.
