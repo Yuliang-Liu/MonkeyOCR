@@ -30,6 +30,7 @@ pip install "paddlex[base]"
 > [!NOTE]
 > 
 > If the installation methods above are not suitable for your environment, or if you wish to explore more options, please refer to the official **[PaddleX](https://github.com/PaddlePaddle/PaddleX)**.
+
 ### **2.  Modify the Configuration File**
 
 Update the `model` field in the [`model_configs.yaml`](https://github.com/Yuliang-Liu/MonkeyOCR/blob/main/model_configs.yaml#L7) file at the project root to `PP-DocLayout_plus-L`.
