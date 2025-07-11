@@ -47,16 +47,13 @@ class BatchAnalyzeLLM:
                 for res in result_list:
                     if res['category_id'] != 5 and 'poly' in res:
                         poly = res['poly']
-                        # Convert poly to coordinates (assuming format: [x1, y1, x2, y2, x3, y3, x4, y4])
                         if len(poly) == 8:
-                            # Find min coordinates (top-left corner)
                             min_x = min(poly[0], poly[2], poly[4], poly[6])
                             min_y = min(poly[1], poly[3], poly[5], poly[7])
                             
-                            # Scale each point relative to top-left corner
                             for i in range(0, 8, 2):
-                                poly[i] = min_x + (poly[i] - min_x) * 1.05      # x coordinate
-                                poly[i+1] = min_y + (poly[i+1] - min_y) * 1.05  # y coordinate
+                                poly[i] = min_x + (poly[i] - min_x) * 1.05
+                                poly[i+1] = min_y + (poly[i+1] - min_y) * 1.05
                         res['poly'] = poly
             
             images_layout_res += layout_results
