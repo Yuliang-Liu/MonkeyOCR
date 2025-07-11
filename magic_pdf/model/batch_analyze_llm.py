@@ -128,9 +128,9 @@ class BatchAnalyzeLLM:
             new_images = []
             cids = []
             for res in layout_res:
-                paste = 0 if res['category_id'] == 5 else 50
+                pad_size = 0 if res['category_id'] == 5 else 50
                 new_image, useful_list = crop_img(
-                    res, pil_img, crop_paste_x=paste, crop_paste_y=paste
+                    res, pil_img, crop_paste_x=pad_size, crop_paste_y=pad_size
                 )
                 new_images.append(new_image)
                 cids.append(res['category_id'])
