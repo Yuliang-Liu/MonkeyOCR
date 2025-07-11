@@ -23,7 +23,6 @@ class BatchAnalyzeLLM:
         if self.model.layout_model_name == MODEL_NAME.DocLayout_YOLO:
             # doclayout_yolo
             layout_images = []
-            modified_images = []
             for image_index, image in enumerate(images):
                 pil_img = Image.fromarray(image)
                 layout_images.append(pil_img)
@@ -32,18 +31,6 @@ class BatchAnalyzeLLM:
                 # layout_images, self.batch_ratio * YOLO_LAYOUT_BASE_BATCH_SIZE
                 layout_images, YOLO_LAYOUT_BASE_BATCH_SIZE
             )
-
-            for image_index, useful_list in modified_images:
-                for res in images_layout_res[image_index]:
-                    for i in range(len(res['poly'])):
-                        if i % 2 == 0:
-                            res['poly'][i] = (
-                                res['poly'][i] - useful_list[0] + useful_list[2]
-                            )
-                        else:
-                            res['poly'][i] = (
-                                res['poly'][i] - useful_list[1] + useful_list[3]
-                            )
                             
         elif self.model.layout_model_name == MODEL_NAME.PaddleXLayoutModel:
             # PP-DocLayout_plus-L
@@ -51,9 +38,28 @@ class BatchAnalyzeLLM:
             for image_index, image in enumerate(images):
                 pil_img = Image.fromarray(image)
                 paddlex_layout_images.append(pil_img)
-            images_layout_res += self.model.layout_model.batch_predict(
+            layout_results = self.model.layout_model.batch_predict(
                 paddlex_layout_images, YOLO_LAYOUT_BASE_BATCH_SIZE 
             )
+            
+            # Scale detection results by 1.05x while keeping top-left corner fixed
+            for result_list in layout_results:
+                for res in result_list:
+                    if res['category_id'] != 5 and 'poly' in res:
+                        poly = res['poly']
+                        # Convert poly to coordinates (assuming format: [x1, y1, x2, y2, x3, y3, x4, y4])
+                        if len(poly) == 8:
+                            # Find min coordinates (top-left corner)
+                            min_x = min(poly[0], poly[2], poly[4], poly[6])
+                            min_y = min(poly[1], poly[3], poly[5], poly[7])
+                            
+                            # Scale each point relative to top-left corner
+                            for i in range(0, 8, 2):
+                                poly[i] = min_x + (poly[i] - min_x) * 1.05      # x coordinate
+                                poly[i+1] = min_y + (poly[i+1] - min_y) * 1.05  # y coordinate
+                        res['poly'] = poly
+            
+            images_layout_res += layout_results
         else: 
             logger.error(f"Unsupported layout model name: {self.model.layout_model_name}")
             raise ValueError(f"Unsupported layout model name: {self.model.layout_model_name}")
@@ -125,8 +131,9 @@ class BatchAnalyzeLLM:
             new_images = []
             cids = []
             for res in layout_res:
+                paste = 0 if res['category_id'] == 5 else 50
                 new_image, useful_list = crop_img(
-                    res, pil_img, crop_paste_x=50, crop_paste_y=50
+                    res, pil_img, crop_paste_x=paste, crop_paste_y=paste
                 )
                 new_images.append(new_image)
                 cids.append(res['category_id'])
