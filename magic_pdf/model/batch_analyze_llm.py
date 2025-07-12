@@ -42,20 +42,6 @@ class BatchAnalyzeLLM:
                 paddlex_layout_images, YOLO_LAYOUT_BASE_BATCH_SIZE 
             )
             
-            # Scale detection results by 1.05x while keeping top-left corner fixed
-            for result_list in layout_results:
-                for res in result_list:
-                    if res['category_id'] != 5 and 'poly' in res:
-                        poly = res['poly']
-                        if len(poly) == 8:
-                            min_x = min(poly[0], poly[2], poly[4], poly[6])
-                            min_y = min(poly[1], poly[3], poly[5], poly[7])
-                            
-                            for i in range(0, 8, 2):
-                                poly[i] = min_x + (poly[i] - min_x) * 1.05
-                                poly[i+1] = min_y + (poly[i+1] - min_y) * 1.05
-                        res['poly'] = poly
-            
             images_layout_res += layout_results
         else: 
             logger.error(f"Unsupported layout model name: {self.model.layout_model_name}")
