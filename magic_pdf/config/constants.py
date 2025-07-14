@@ -40,6 +40,11 @@ class MODEL_NAME:
     DocLayout_YOLO = 'doclayout_yolo'
     PaddleXLayoutModel = 'PP-DocLayout_plus-L'
 
+class LAYOUT_READER_MODEL:
+    LayoutReader = 'layoutreader' # Official self-trained model
+    LayoutReader_only_layout_large = 'layoutReader-only-layout-large'
+    LayoutReader_huatian = 'layoutreader_huatian'
+
 PARSE_TYPE_TXT = 'txt'
 PARSE_TYPE_OCR = 'ocr'
 

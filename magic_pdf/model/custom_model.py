@@ -13,6 +13,7 @@ from PIL import Image
 from typing import List, Union
 from openai import OpenAI
 import asyncio
+from magic_pdf.model.sub_modules.reading_oreder.layoutreader.only_layout_large import LayoutLMv3ForBboxClassification
 
 
 class MonkeyOCR:
@@ -51,7 +52,8 @@ class MonkeyOCR:
         self.layout_model_name = self.layout_config.get(
             'model', MODEL_NAME.DocLayout_YOLO
         )
-
+        
+        # layout model
         atom_model_manager = AtomModelSingleton()
         if self.layout_model_name == MODEL_NAME.DocLayout_YOLO:
             layout_model_path = os.path.join(models_dir, self.configs['weights'][self.layout_model_name])
@@ -78,32 +80,58 @@ class MonkeyOCR:
             )
         logger.info(f'layout model loaded: {self.layout_model_name}')
 
-
+        # layout reader model
         layout_reader_config = self.layout_config.get('reader')
         self.layout_reader_name = layout_reader_config.get('name')
-        if self.layout_reader_name == 'layoutreader':
+        logger.info(f'layoutreader model name: {self.layout_reader_name}')
+        
+        layoutreader_model_dir = None
+        if self.layout_reader_name in self.configs['weights']:
             layoutreader_model_dir = os.path.join(models_dir, self.configs['weights'][self.layout_reader_name])
-            if os.path.exists(layoutreader_model_dir):
-                model = LayoutLMv3ForTokenClassification.from_pretrained(
-                    layoutreader_model_dir
-                )
-            else:
-                logger.warning(
-                    'local layoutreader model not exists, use online model from huggingface'
-                )
-                model = LayoutLMv3ForTokenClassification.from_pretrained(
-                    'hantian/layoutreader'
-                )
 
-            if bf16_supported:
-                model.to(self.device).eval().bfloat16()
-            else:
-                model.to(self.device).eval()
+        model = None
+        logger.info(f'layoutreader model dir: {layoutreader_model_dir}')
+
+        if layoutreader_model_dir is not None and os.path.exists(layoutreader_model_dir):
+            try:
+                if self.layout_reader_name == LAYOUT_READER_MODEL.LayoutReader:
+                    model = LayoutLMv3ForTokenClassification.from_pretrained(
+                        layoutreader_model_dir
+                    )
+                elif self.layout_reader_name == LAYOUT_READER_MODEL.LayoutReader_only_layout_large:
+                    model = LayoutLMv3ForBboxClassification.from_pretrained(
+                        layoutreader_model_dir
+                    )
+
+                if model is not None:
+                    logger.info(f'layoutreader model loaded successfully: {self.layout_reader_name}')
+                else:
+                    logger.error(f'Model loaded but is None: {self.layout_reader_name}')
+
+            except Exception as e:
+                logger.error(f'Failed to load layoutreader model: {e}')
+                logger.error(f'Exception details: {str(e)}')
+                model = None
         else:
-            logger.error('model name not allow')
-        self.layoutreader_model = model
-        logger.info(f'layoutreader model loaded: {self.layout_reader_name}')
+            logger.error(f'layoutreader model dir not found: {layoutreader_model_dir}')
 
+        if model is None:
+            logger.info(f'Attempting to load fallback model: hantian/layoutreader')
+            try:
+                self.layout_reader_name = LAYOUT_READER_MODEL.LayoutReader_huatian
+                model = LayoutLMv3ForTokenClassification.from_pretrained('hantian/layoutreader')
+                logger.info(f'Fallback model loaded successfully')
+            except Exception as e:
+                logger.error(f'Unable to load any layoutreader model: {e}')
+                raise e
+        
+        if bf16_supported:
+                model.to(self.device).eval().bfloat16()
+        else:
+            model.to(self.device).eval()
+        self.layoutreader_model = model
+        
+        # chat model
         self.chat_config = self.configs.get('chat_config', {})
         chat_backend = self.chat_config.get('backend', 'lmdeploy')
         chat_path = self.chat_config.get('weight_path', 'model_weight/Recognition')

@@ -131,6 +131,9 @@ python parse.py input.pdf --pred-abandon            # Enable predicting abandon 
 > ```yaml
 > model: PP-DocLayout_plus-L
 > ```
+>
+> We have also added support for the **LayoutReader-only-layout-large** model, this model provides better support for reading order prediction in complex multi-column layouts. Please refer to the [LayoutReader-only-layout-large Usage Guide](docs/layoutreader_only_layout_large_guide.md).
+
 
 
 #### Output Results
