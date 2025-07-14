@@ -6,7 +6,7 @@ weights:
   # layoutReader-only-layout-large: LayoutReader-only-layout-large
 models_dir: model_weight
 layout_config: 
-  model: doclayout_yolo # PP-DocLayout_plus-L / doclayout_yolo
+  model: doclayout_yolo # PP-DocLayout_plus-L (used by MonkeyOCR-pro) / doclayout_yolo
   reader:
     name: layoutreader # layoutreader / layoutReader-only-layout-large
 chat_config:

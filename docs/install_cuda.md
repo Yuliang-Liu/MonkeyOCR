@@ -45,7 +45,7 @@ pip install https://github.com/InternLM/lmdeploy/releases/download/v0.8.0/lmdepl
 ```
 
 > [!IMPORTANT]
-> ### Fixing the **Shared Memory Error** on **30/40 series / V100 ...** GPUs (Optional)
+> ### Fixing the **Shared Memory Error** on **20/30/40 series / V100 ...** GPUs (Optional)
 > 
 > Our 3B model runs smoothly on the NVIDIA RTX 30/40 series. However, when using **LMDeploy** as the inference backend, you might run into compatibility issues on these GPUs — typically this error:
 > 
