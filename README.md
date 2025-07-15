@@ -181,20 +181,20 @@ See detailed results below.
 # Quick Start
 ## Locally Install
 ### 1. Install MonkeyOCR
-See the [installation guide](https://github.com/Yuliang-Liu/MonkeyOCR/blob/main/docs/install_cuda.md#install-with-cuda-support) to set up your environment.
+See the [installation guide](https://github.com/Yuliang-Liu/MonkeyOCR/blob/main/docs/install_cuda_pp.md#install-with-cuda-support) to set up your environment.
 ### 2. Download Model Weights
 Download our model from Huggingface.
 ```python
 pip install huggingface_hub
 
-python tools/download_model.py -n MonkeyOCR-pro-1.2B  # MonkeyOCR
+python tools/download_model.py -n MonkeyOCR  # MonkeyOCR-pro-1.2B
 ```
 You can also download our model from ModelScope.
 
 ```python
 pip install modelscope
 
-python tools/download_model.py -t modelscope -n MonkeyOCR-pro-1.2B   # MonkeyOCR
+python tools/download_model.py -t modelscope -n MonkeyOCR  # MonkeyOCR-pro-1.2B
 ```
 ### 3. Inference
 You can parse a file or a directory containing PDFs or images using the following commands:
@@ -251,28 +251,10 @@ python parse.py input.pdf --pred-abandon            # Enable predicting abandon 
 
 </details>
 
-> [!TIP]
-> 
-> For Chinese scenarios, or cases where text, tables, etc. are mistakenly recognized as images, you can try using the following structure detection model: [layout\_zh.pt](https://huggingface.co/echo840/MonkeyOCR/blob/main/Structure/layout_zh.pt).
-> (If the model is not found in `model_weight/Structure/`, you can download it manually.)
-> 
-> To use this model, update the configuration file [`model_configs.yaml`](https://github.com/Yuliang-Liu/MonkeyOCR/blob/main/model_configs.yaml#L3) as follows:  
-> 
-> ```yaml
-> doclayout_yolo: Structure/layout_zh.pt
-> ```
->
-> We have added support for the [PP-DocLayout_plus-L](https://huggingface.co/PaddlePaddle/PP-DocLayout_plus-L), which offers improved performance over doclayout_yolo. MonkeyOCR-pro-3B and MonkeyOCR-pro-1.2B utilized PP-DocLayout_plus-L for evaluation.  Please refer to the [Usage Guide](docs/install_paddlex.md).
->
-> To use this model, please update the configuration file [`model_configs.yaml`](https://github.com/Yuliang-Liu/MonkeyOCR/blob/main/model_configs.yaml#L7) as follows:
->
-> ```yaml
-> model: PP-DocLayout_plus-L
-> ```
+<details>
+<summary><b>Output Results</b></summary>
 
-
-#### Output Results
-MonkeyOCR generates three types of output files:
+MonkeyOCR mainly generates three types of output files:
 
 1. **Processed Markdown File** (`your.md`): The final parsed document content in markdown format, containing text, formulas, tables, and other structured elements.
 2. **Layout Results** (`your_layout.pdf`): The layout results drawed on origin PDF.
@@ -283,11 +265,13 @@ MonkeyOCR generates three types of output files:
 
 These files provide both the final formatted output and detailed intermediate results for further analysis or processing.
 
+</details>
+
 ### 4. Gradio Demo
 ```bash
-# Start demo
 python demo/demo_gradio.py
 ```
+Once the demo is running, you can access it at http://localhost:7860.
 
 ### 5. Fast API
 You can start the MonkeyOCR FastAPI service with the following command:
@@ -321,7 +305,7 @@ Once the API service is running, you can access the API documentation at http://
 
 > [!IMPORTANT]
 >
-> If your GPU is from the 30/40-series, V100, or similar, please build the patched Docker image for LMDeploy compatibility:
+> If your GPU is from the 20/30/40-series, V100, or similar, please build the patched Docker image for LMDeploy compatibility:
 >
 > ```bash
 > docker compose build monkeyocr-fix
@@ -349,17 +333,15 @@ Once the API service is running, you can access the API documentation at http://
 
 ## Windows Support 
 
-See the [Windows Support](docs/windows_support.md) Guide for details.
+See the [windows support guide](docs/windows_support.md) for details.
 
 ## Quantization
 
-This model can be quantized using AWQ. Follow the instructions in the [Quantization guide](docs/Quantization.md).
+This model can be quantized using AWQ. Follow the instructions in the [quantization guide](docs/Quantization.md).
 
 ## Benchmark Results
 
-
 Here are the evaluation results of our model on OmniDocBench. MonkeyOCR-3B uses DocLayoutYOLO as the structure detection model, while MonkeyOCR-3B* uses our trained structure detection model with improved Chinese performance.
-
 
 ### 1. The end-to-end evaluation results of different tasks.
 

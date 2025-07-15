@@ -1,11 +1,11 @@
 device: cuda # cuda / cpu / mps (using `transformers` as backend)
 weights:
   doclayout_yolo: Structure/doclayout_yolo_docstructbench_imgsz1280_2501.pt # or Structure/layout_zh.pt
-  # PP-DocLayout_plus-L: Structure/PP-DocLayout_plus-L
+  PP-DocLayout_plus-L: Structure/PP-DocLayout_plus-L
   layoutreader: Relation
 models_dir: model_weight
 layout_config: 
-  model: doclayout_yolo # PP-DocLayout_plus-L (used by MonkeyOCR-pro) / doclayout_yolo
+  model: PP-DocLayout_plus-L # PP-DocLayout_plus-L (MonkeyOCR-pro) / doclayout_yolo (MonkeyOCR)
   reader:
     name: layoutreader
 chat_config:

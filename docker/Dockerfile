@@ -14,29 +14,32 @@ RUN ln -sf /usr/bin/python3.10 /usr/bin/python && \
 # Create non-root user
 RUN useradd -m -s /bin/bash appuser
 
-# Copy dependency files first to leverage caching
-COPY --chown=appuser:appuser setup.py pyproject.toml* docker/requirements.txt* /app/MonkeyOCR/
-
 # Configure pip to use faster mirror and upgrade
 RUN pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple
 RUN pip install --upgrade pip setuptools || echo "Warning: pip upgrade failed"
 
-RUN pip install torch==2.5.1 torchvision==0.20.1 torchaudio==2.5.1 -i https://download.pytorch.org/whl/cu124
-
-# Set working directory to /app/MonkeyOCR
-WORKDIR /app/MonkeyOCR
-
-# Install project dependencies (if requirements.txt exists)
-RUN if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+# Install PyTorch (updated to version 2.6.0)
+ARG CUDA_VERSION=126
+RUN pip install torch==2.6.0 torchvision==0.21.0 torchaudio==2.6.0 --index-url https://download.pytorch.org/whl/cu${CUDA_VERSION}
 
 # Copy project code
 COPY --chown=appuser:appuser . /app/MonkeyOCR
 
+# Set working directory to /app/MonkeyOCR
+WORKDIR /app/MonkeyOCR
+
 # Install project itself
 RUN pip install -e .
 
+# Install inference backend dependencies
+RUN pip install lmdeploy==0.8.0
+
 # Install model download related dependencies
 RUN pip install modelscope huggingface_hub
+
+# Install PaddlePaddle and PaddleX for PP-DocLayout_plus-L support
+RUN pip install paddlepaddle-gpu==3.0.0 -i https://www.paddlepaddle.org.cn/packages/stable/cu${CUDA_VERSION}/
+RUN pip install "paddlex[base]"
 
 # Copy model download scripts
 COPY --chown=appuser:appuser docker/download_models.sh /app/MonkeyOCR/
