@@ -16,6 +16,6 @@ if __name__ == '__main__':
         snapshot_download(repo_id="echo840/"+args.name, local_dir=model_dir, local_dir_use_symlinks=False, resume_download=True)
         snapshot_download(repo_id="PaddlePaddle/PP-DocLayout_plus-L", local_dir=model_dir)
     elif args.type == "modelscope":
-        from modelscope import snapshot_download as modelscope_download
-        modelscope_download(repo_id = 'l1731396519/'+args.name,local_dir=model_dir)
+        from modelscope import snapshot_download
+        snapshot_download(repo_id = 'l1731396519/'+args.name,local_dir=model_dir)
         snapshot_download(repo_id="PaddlePaddle/PP-DocLayout_plus-L", local_dir=model_dir)
