@@ -70,6 +70,11 @@ class MonkeyOCR:
             layout_model_path = None
             if self.layout_model_name in self.configs['weights']:
                 layout_model_path = os.path.join(models_dir, self.configs['weights'][self.layout_model_name])
+                if not os.path.exists(layout_model_path):
+                    raise FileNotFoundError(
+                        f"Layout model file not found at '{layout_model_path}'. "
+                        "Please run 'python download_model.py' to download the required models."
+                    )
             self.layout_model = atom_model_manager.get_atom_model(
                 atom_model_name=AtomicModel.Layout,
                 layout_model_name=MODEL_NAME.PaddleXLayoutModel,
@@ -88,11 +93,9 @@ class MonkeyOCR:
                     layoutreader_model_dir
                 )
             else:
-                logger.warning(
-                    'local layoutreader model not exists, use online model from huggingface'
-                )
-                model = LayoutLMv3ForTokenClassification.from_pretrained(
-                    'hantian/layoutreader'
+                raise FileNotFoundError(
+                    f"Reading Order model file not found at '{layoutreader_model_dir}'. "
+                    "Please run 'python download_model.py' to download the required models."
                 )
 
             if bf16_supported:
@@ -107,6 +110,13 @@ class MonkeyOCR:
         self.chat_config = self.configs.get('chat_config', {})
         chat_backend = self.chat_config.get('backend', 'lmdeploy')
         chat_path = self.chat_config.get('weight_path', 'model_weight/Recognition')
+        if not os.path.exists(chat_path):
+            chat_path = os.path.join(models_dir, chat_path)
+            if not os.path.exists(chat_path):
+                raise FileNotFoundError(
+                    f"Chat model file not found at '{chat_path}'. "
+                    "Please run 'python download_model.py' to download the required models."
+                )
         if chat_backend == 'lmdeploy':
             logger.info('Use LMDeploy as backend')
             self.chat_model = MonkeyChat_LMDeploy(chat_path)
