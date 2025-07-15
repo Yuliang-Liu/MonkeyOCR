@@ -187,14 +187,14 @@ Download our model from Huggingface.
 ```python
 pip install huggingface_hub
 
-python tools/download_model.py -n MonkeyOCR  # MonkeyOCR-pro-1.2B
+python tools/download_model.py -n MonkeyOCR  # or MonkeyOCR-pro-1.2B
 ```
 You can also download our model from ModelScope.
 
 ```python
 pip install modelscope
 
-python tools/download_model.py -t modelscope -n MonkeyOCR  # MonkeyOCR-pro-1.2B
+python tools/download_model.py -t modelscope -n MonkeyOCR  # or MonkeyOCR-pro-1.2B
 ```
 ### 3. Inference
 You can parse a file or a directory containing PDFs or images using the following commands:
