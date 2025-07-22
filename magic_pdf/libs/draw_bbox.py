@@ -14,7 +14,7 @@ def draw_bbox_without_number(i, bbox_list, page, rgb_config, fill_config):
     page_data = bbox_list[i]
     for bbox in page_data:
         x0, y0, x1, y1 = bbox
-        rect_coords = fitz.Rect(x0, y0, x1, y1)  # Define the rectangle
+        rect_coords = fitz.Rect(x0, y0, x1, y1) * page.derotation_matrix  # Define the rectangle
         if fill_config:
             page.draw_rect(
                 rect_coords,
@@ -43,7 +43,7 @@ def draw_bbox_with_number(i, bbox_list, page, rgb_config, fill_config, draw_bbox
     page_data = bbox_list[i]
     for j, bbox in enumerate(page_data):
         x0, y0, x1, y1 = bbox
-        rect_coords = fitz.Rect(x0, y0, x1, y1)  # Define the rectangle
+        rect_coords = fitz.Rect(x0, y0, x1, y1) * page.derotation_matrix  # Define the rectangle
         if draw_bbox:
             if fill_config:
                 page.draw_rect(
@@ -64,7 +64,7 @@ def draw_bbox_with_number(i, bbox_list, page, rgb_config, fill_config, draw_bbox
                     overlay=True,
                 )  # Draw the rectangle
         page.insert_text(
-            (x1 + 2, y0 + 10), str(j + 1), fontsize=10, color=new_rgb
+            (rect_coords.x1 + 2, rect_coords.y0 + 10), str(j + 1), fontsize=10, color=new_rgb, rotate=page.rotation,
         )  # Insert the index in the top left corner of the rectangle
 
 

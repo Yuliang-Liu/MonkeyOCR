@@ -564,7 +564,7 @@ class Doc(PageableData):
             overlay=overlay,
         )
 
-    def insert_text(self, coord, content, fontsize, color):
+    def insert_text(self, coord, content, fontsize, color, rotate):
         """insert text.
 
         Args:
@@ -572,5 +572,6 @@ class Doc(PageableData):
             content (str): the text content
             fontsize (int): font size of the text
             color (list[float] | None):  three element tuple which describe the RGB of the board line, None will use the default font color!
+            rotate (int): the rotation of the text, None means no rotation
         """
-        self._doc.insert_text(coord, content, fontsize=fontsize, color=color)
+        self._doc.insert_text(coord, content, fontsize=fontsize, color=color, rotate=rotate)
