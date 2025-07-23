@@ -1,0 +1,77 @@
+# === Stage 1: Builder ===
+# This stage installs all Python dependencies.
+FROM nvidia/cuda:12.4.1-runtime-ubuntu22.04 as builder
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y     python3.10 python3.10-dev python3-pip git curl wget     && rm -rf /var/lib/apt/lists/*
+
+# Set up python symlinks
+RUN ln -sf /usr/bin/python3.10 /usr/bin/python &&     ln -sf /usr/bin/pip3 /usr/bin/pip
+
+# Upgrade pip and set pypi mirror
+RUN pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple &&     pip install --upgrade pip setuptools
+
+# Install PyTorch
+ARG CUDA_VERSION=124
+RUN pip install torch==2.6.0 torchvision==0.21.0 torchaudio==2.6.0 --index-url https://download.pytorch.org/whl/cu${CUDA_VERSION}
+
+# Copy project code and install dependencies
+COPY . /app/MonkeyOCR
+WORKDIR /app/MonkeyOCR
+
+# Install dependencies from requirements.txt and the project itself
+RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir -e .
+
+# Install extra dependencies for inference and specific models
+RUN pip install --no-cache-dir lmdeploy==0.8.0 modelscope huggingface_hub "paddlex[base]"
+RUN pip install --no-cache-dir paddlepaddle-gpu==3.0.0 -i https://www.paddlepaddle.org.cn/packages/stable/cu${CUDA_VERSION}/
+
+# === Stage 2: Model Downloader ===
+# This stage downloads the models.
+FROM builder as model-downloader
+
+WORKDIR /app/MonkeyOCR
+
+# Download models
+RUN python tools/download_model.py -t modelscope || python tools/download_model.py
+
+# === Stage 3: Final Image ===
+# This is the final, clean image for production.
+FROM nvidia/cuda:12.4.1-runtime-ubuntu22.04
+
+# Install system packages required for runtime
+RUN apt-get update && apt-get install -y     python3.10 libgl1-mesa-glx libglib2.0-0 poppler-utils     && rm -rf /var/lib/apt/lists/*
+
+# Create non-root user
+RUN useradd -m -s /bin/bash appuser
+
+# Copy Python environment from builder stage
+COPY --from=builder /usr/local/lib/python3.10/site-packages /usr/local/lib/python3.10/site-packages
+COPY --from=builder /usr/local/bin /usr/local/bin
+
+# Set up python symlinks
+RUN ln -sf /usr/bin/python3.10 /usr/bin/python &&     ln -sf /usr/bin/pip3 /usr/bin/pip
+
+# Copy application code
+COPY --chown=appuser:appuser . /app/MonkeyOCR
+WORKDIR /app/MonkeyOCR
+
+# Ensure tasks.py is included in the image
+COPY --chown=appuser:appuser tasks.py /app/MonkeyOCR/
+
+# Copy downloaded models from the model-downloader stage
+COPY --from=model-downloader /app/MonkeyOCR/model_weight /app/MonkeyOCR/model_weight
+
+# Apply LMDeploy patcher if needed
+ARG LMDEPLOY_PATCHED=false
+RUN if [ "$LMDEPLOY_PATCHED" = "true" ]; then       python tools/lmdeploy_patcher.py patch;     fi
+
+# Set ownership and switch to non-root user
+RUN chown -R appuser:appuser /app/MonkeyOCR
+USER appuser
+
+# Default command: start the Celery worker.
+# For GPU tasks, it is recommended to run one worker with one process per container.
+# The concurrency can be scaled by running more containers.
+CMD ["celery", "-A", "tasks", "worker", "--loglevel=info", "-c", "1"]
