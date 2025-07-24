@@ -2,25 +2,29 @@
 import os
 import tempfile
 import requests
+import json
+import fitz # PyMuPDF
 from celery import Celery, Task
 
 # Import the necessary components from the existing MonkeyOCR project
 # This demonstrates the principle of treating MonkeyOCR as a library
 from magic_pdf.model.custom_model import MonkeyOCR
 from parse import parse_file
+from monkeyocr.conf.settings import app_settings
+from monkeyocr.utils.oss import download_file_from_oss, upload_file_to_oss
 
 # 1. Celery Configuration
-# We will use Redis as the message broker and result backend.
-# The broker URL should be configured via environment variables for production.
-CELERY_BROKER_URL = os.environ.get('CELERY_BROKER_URL', 'redis://localhost:6379/0')
-CELERY_RESULT_BACKEND = os.environ.get('CELERY_RESULT_BACKEND', 'redis://localhost:6379/0')
-
 # Create the Celery application instance
 app = Celery(
     'monkey_ocr_tasks',
-    broker=CELERY_BROKER_URL,
-    backend=CELERY_RESULT_BACKEND
+    broker=app_settings.celery.broker_url,
+    backend=app_settings.celery.result_backend
 )
+
+# Apply Celery settings from app_settings.celery
+for key, value in app_settings.celery.model_dump().items():
+    # Celery configuration keys are typically uppercase
+    app.conf.update({key.upper(): value})
 
 # Optional: Configure Celery for better production practices
 app.conf.update(
@@ -59,36 +63,32 @@ class OcrTask(Task):
 # 3. Define the Celery Task
 # We register our class-based task with Celery.
 @app.task(base=OcrTask, bind=True)
-def process_document(self, pdf_url):
+def process_document(self, bucket_name: str, file_key: str):
     """
-    A Celery task to process a single PDF document.
+    A Celery task to process a single PDF document from OSS.
 
     Args:
-        pdf_url (str): The URL of the PDF file to process.
+        bucket_name (str): The name of the OSS bucket where the PDF is located.
+        file_key (str): The key (path) of the PDF file in the bucket.
 
     Returns:
         dict: A dictionary containing the status and the path to the results.
     """
-    print(f"Received task to process document: {pdf_url}")
+    print(f"Received task to process document: {bucket_name}/{file_key}")
 
     # Create temporary directories for input and output
     with tempfile.TemporaryDirectory() as temp_dir:
-        input_path = os.path.join(temp_dir, 'input.pdf')
+        input_path = os.path.join(temp_dir, os.path.basename(file_key))
         output_dir = os.path.join(temp_dir, 'output')
         os.makedirs(output_dir, exist_ok=True)
 
         try:
-            # Step 1: Download the PDF from the URL
-            print(f"Downloading PDF from {pdf_url}...")
-            response = requests.get(pdf_url, stream=True)
-            response.raise_for_status() # Raise an exception for bad status codes
-            with open(input_path, 'wb') as f:
-                for chunk in response.iter_content(chunk_size=8192):
-                    f.write(chunk)
+            # Step 1: Download the PDF from OSS
+            print(f"Downloading PDF from {bucket_name}/{file_key}...")
+            download_file_from_oss(bucket_name, file_key, input_path)
             print(f"PDF downloaded to {input_path}")
 
             # Step 2: Process the file using the pre-loaded model
-            # We call the original parse_file function, passing the model instance.
             print(f"Starting PDF parsing with MonkeyOCR...")
             result_path = parse_file(
                 input_file=input_path,
@@ -99,25 +99,84 @@ def process_document(self, pdf_url):
             )
             print(f"PDF parsing complete. Results are in: {result_path}")
 
-            # Step 3: (Placeholder) Upload results to a persistent storage (e.g., S3)
-            # In a real application, you would upload the contents of `result_path`
-            # to a cloud storage and return the URL.
-            # For this example, we'll just list the output files.
-            result_files = os.listdir(result_path)
-            print(f"Result files: {result_files}")
-
-            # Here, you would implement the upload logic and then clean up.
+            # Step 3: Upload results to scholardata_bucket
+            # Assuming the output_dir contains the main result file (e.g., a JSON or Markdown)
+            # You might need to adjust this logic based on the actual output structure of parse_file
+            result_files = [f for f in os.listdir(result_path) if os.path.isfile(os.path.join(result_path, f))]
+            uploaded_files = []
+            for result_file in result_files:
+                local_result_file_path = os.path.join(result_path, result_file)
+                upload_key = f"processed_documents/{file_key}/{result_file}" # Example upload key
+                print(f"Uploading {local_result_file_path} to {app_settings.scholardata_bucket_name}/{upload_key}...")
+                upload_file_to_oss(app_settings.scholardata_bucket_name, upload_key, local_result_file_path)
+                uploaded_files.append(upload_key)
+            print(f"Processed files uploaded: {uploaded_files}")
 
             return {
                 'status': 'success',
-                'pdf_url': pdf_url,
-                'result_path': result_path, # In real life, this would be an S3 path
-                'output_files': result_files
+                'source_bucket': bucket_name,
+                'source_file_key': file_key,
+                'uploaded_bucket': app_settings.scholardata_bucket_name,
+                'uploaded_keys': uploaded_files
             }
 
         except Exception as e:
-            print(f"Error processing {pdf_url}: {e}")
-            # Celery can automatically retry the task if you raise an exception
+            print(f"Error processing {bucket_name}/{file_key}: {e}")
+            raise
+
+
+@app.task(bind=True)
+def process_document_metadata(self, bucket_name: str, file_key: str):
+    """
+    A Celery task to download a PDF, extract its header metadata, and upload it as JSON.
+
+    Args:
+        bucket_name (str): The name of the OSS bucket where the PDF is located.
+        file_key (str): The key (path) of the PDF file in the bucket.
+
+    Returns:
+        dict: A dictionary containing the status and the path to the uploaded metadata JSON.
+    """
+    print(f"Received task to process metadata for: {bucket_name}/{file_key}")
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        local_pdf_path = os.path.join(temp_dir, os.path.basename(file_key))
+        metadata_json_path = os.path.join(temp_dir, f"{os.path.basename(file_key)}.json")
+
+        try:
+            # Step 1: Download the PDF from OSS
+            print(f"Downloading {file_key} from {bucket_name}...")
+            download_file_from_oss(bucket_name, file_key, local_pdf_path)
+            print(f"PDF downloaded to {local_pdf_path}")
+
+            # Step 2: Extract PDF header information
+            print(f"Extracting metadata from {local_pdf_path}...")
+            doc = fitz.open(local_pdf_path)
+            metadata = doc.metadata
+            doc.close()
+            print(f"Extracted metadata: {metadata}")
+
+            # Step 3: Save metadata as JSON
+            with open(metadata_json_path, 'w', encoding='utf-8') as f:
+                json.dump(metadata, f, ensure_ascii=False, indent=4)
+            print(f"Metadata saved to {metadata_json_path}")
+
+            # Step 4: Upload JSON to scholardata_bucket
+            upload_key = f"{app_settings.scholardata_header_prefix}/{os.path.basename(file_key)}.json"
+            print(f"Uploading metadata JSON to {app_settings.scholardata_bucket_name}/{upload_key}...")
+            upload_file_to_oss(app_settings.scholardata_bucket_name, upload_key, metadata_json_path)
+            print(f"Metadata JSON uploaded to {upload_key}")
+
+            return {
+                'status': 'success',
+                'source_bucket': bucket_name,
+                'source_file_key': file_key,
+                'uploaded_bucket': app_settings.scholardata_bucket_name,
+                'uploaded_key': upload_key
+            }
+
+        except Exception as e:
+            print(f"Error processing metadata for {bucket_name}/{file_key}: {e}")
             raise
 
 # To run a worker for this:
