@@ -1,6 +1,6 @@
 import requests
 import logging
-from unobpi.conf import app_settings
+from monkeyocr.conf import app_settings
 
 __all__ = ["notify_task_finished"]
 

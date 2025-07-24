@@ -2,7 +2,8 @@ import os
 import sys
 import enum
 import logging
-from typing import Type, Tuple, Self
+from typing import Type, Tuple
+from typing_extensions import Self
 
 from pydantic import model_validator
 from pydantic_settings import (

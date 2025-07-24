@@ -22,9 +22,9 @@ app = Celery(
 )
 
 # Apply Celery settings from app_settings.celery
-for key, value in app_settings.celery.model_dump().items():
+#for key, value in app_settings.celery.model_dump().items():
     # Celery configuration keys are typically uppercase
-    app.conf.update({key.upper(): value})
+#    app.conf.update({key.upper(): value})
 
 # Optional: Configure Celery for better production practices
 app.conf.update(

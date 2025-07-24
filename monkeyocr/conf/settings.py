@@ -1,7 +1,7 @@
 import logging
 import os
 from functools import cached_property
-from typing import Annotated, Self
+from typing_extensions import Annotated, Self
 
 import oss2
 import sentry_sdk

@@ -21,3 +21,6 @@ fastapi>=0.104.1
 uvicorn[standard]>=0.24.0
 celery>=5.3.6
 redis>=5.0.1
+sentry_sdk==2.27.0
+oss2==2.19.1
+pydantic_settings==2.9.1
