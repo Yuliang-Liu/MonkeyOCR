@@ -21,10 +21,15 @@ app = Celery(
     backend=app_settings.celery.result_backend
 )
 
-# Apply Celery settings from app_settings.celery
-#for key, value in app_settings.celery.model_dump().items():
-    # Celery configuration keys are typically uppercase
-#    app.conf.update({key.upper(): value})
+def update_celery_config_from_settings(app, celery_settings):
+    """
+    Update Celery app config from a Pydantic settings object, using only lowercase keys (Celery 5.x+ requirement).
+    """
+    config_dict = celery_settings.model_dump()
+    app.conf.update(config_dict)  # 只用小写 key，避免新旧混用
+
+# Apply Celery settings from app_settings.celery (全部小写)
+update_celery_config_from_settings(app, app_settings.celery)
 
 # Optional: Configure Celery for better production practices
 app.conf.update(
