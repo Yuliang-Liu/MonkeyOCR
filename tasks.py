@@ -46,12 +46,13 @@ app.conf.update(
 # This is the key to loading the model only once per worker process.
 class OcrTask(Task):
     """
-    A Celery Task that loads the MonkeyOCR model upon initialization.
+    A Celery Task that loads the MonkeyOCR model upon first access.
     The model is then available for all subsequent task executions within that worker process.
     """
     _model = None
 
-    def __init__(self):
+    @property
+    def model(self):
         if self._model is None:
             print("Initializing and loading MonkeyOCR model...")
             # Assuming model_configs.yaml is in the root directory
@@ -60,9 +61,6 @@ class OcrTask(Task):
                 raise FileNotFoundError(f"Model config not found at {config_path}")
             self._model = MonkeyOCR(config_path)
             print("MonkeyOCR model loaded successfully.")
-
-    @property
-    def model(self):
         return self._model
 
 # 3. Define the Celery Task
@@ -98,22 +96,27 @@ def process_document(self, bucket_name: str, file_key: str):
             result_path = parse_file(
                 input_file=input_path,
                 output_dir=output_dir,
-                MonkeyOCR_model=self.model, # Access the model from the task instance
-                split_pages=False, # Example: you can pass parameters here
-                pred_abandon=False
+                MonkeyOCR_model=self.model,  # Access the model from the task instance
+                split_pages=False,  # Process as single document
+                pred_abandon=False  # Don't predict abandon elements
             )
             print(f"PDF parsing complete. Results are in: {result_path}")
 
             # Step 3: Upload results to scholardata_bucket
-            # Assuming the output_dir contains the main result file (e.g., a JSON or Markdown)
-            # You might need to adjust this logic based on the actual output structure of parse_file
-            result_files = [f for f in os.listdir(result_path) if os.path.isfile(os.path.join(result_path, f))]
+            # parse_file generates multiple files: markdown, PDFs, JSONs, images
+            result_files = []
+            for root, dirs, files in os.walk(result_path):
+                for file in files:
+                    file_path = os.path.join(root, file)
+                    # Get relative path from result_path
+                    rel_path = os.path.relpath(file_path, result_path)
+                    result_files.append((file_path, rel_path))
+            
             uploaded_files = []
-            for result_file in result_files:
-                local_result_file_path = os.path.join(result_path, result_file)
-                upload_key = f"processed_documents/{file_key}/{result_file}" # Example upload key
-                print(f"Uploading {local_result_file_path} to {app_settings.scholardata_bucket_name}/{upload_key}...")
-                upload_file_to_oss(app_settings.scholardata_bucket_name, upload_key, local_result_file_path)
+            for local_file_path, rel_path in result_files:
+                upload_key = f"monkey_ocr/{file_key}/{rel_path}"
+                print(f"Uploading {local_file_path} to {app_settings.scholardata_bucket_name}/{upload_key}...")
+                upload_file_to_oss(app_settings.scholardata_bucket_name, upload_key, local_file_path)
                 uploaded_files.append(upload_key)
             print(f"Processed files uploaded: {uploaded_files}")
 
@@ -122,7 +125,8 @@ def process_document(self, bucket_name: str, file_key: str):
                 'source_bucket': bucket_name,
                 'source_file_key': file_key,
                 'uploaded_bucket': app_settings.scholardata_bucket_name,
-                'uploaded_keys': uploaded_files
+                'uploaded_keys': uploaded_files,
+                'result_path': result_path
             }
 
         except Exception as e:
