@@ -1,10 +1,10 @@
 import sys
 import argparse
 from celery import Celery
-from unobpi.main import celery_app
+from tasks import app
 
 def query_result(task_id):
-    async_result = celery_app.AsyncResult(task_id)
+    async_result = app.AsyncResult(task_id)
     print(f"Task [{task_id}] status: {async_result.status}")
     if async_result.status == "SUCCESS":
         print("Result:", async_result.result)
