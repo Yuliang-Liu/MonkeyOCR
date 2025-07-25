@@ -51,6 +51,8 @@ htmlcov/
 # Django stuff:
 *.log
 local_settings.py
+# 配置 yaml 文件
+settings.yaml
 db.sqlite3
 
 # Flask stuff:
@@ -122,3 +124,4 @@ dmypy.json
 
 # Celery beat schedule file
 celerybeat-schedule.*
+
