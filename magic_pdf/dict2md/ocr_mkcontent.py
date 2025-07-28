@@ -62,7 +62,7 @@ def ocr_mk_markdown_with_para_core_v2(paras_of_layout,
             para_text = merge_para_with_text(para_block)
         elif para_type == BlockType.Title:
             title_level = get_title_level(para_block)
-            para_text = f'{"#" * title_level} {merge_para_with_text(para_block)}'
+            para_text = f'{"#" * title_level} {merge_para_with_text(para_block)}'.replace('\n', f'\n{"#" * title_level}')
         elif para_type == BlockType.InterlineEquation:
             para_text = merge_para_with_text(para_block)
         elif para_type == BlockType.Image:
