@@ -95,7 +95,7 @@ def load_image(image_url: Union[str, Image.Image], max_size: int = None, min_siz
     return img
 
 
-def pdf_to_images(pdf_path, dpi=200):
+def pdf_to_images(pdf_path: str, dpi: int = 200) -> List[Image.Image]:
     """Read PDF from path to a list of PIL images."""
     doc = fitz.open(pdf_path)
 
