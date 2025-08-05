@@ -1,11 +1,10 @@
 import gradio as gr
 import os
 import base64
-from pdf2image import convert_from_path
-import re  # Add regex module
-import zipfile  # Add compression module
+from magic_pdf.utils.load_image import pdf_to_images
+import re
+import zipfile
 import subprocess
-from pathlib import Path
 import tempfile
 import uuid
 
@@ -96,7 +95,7 @@ if __name__ == '__main__':
                 return f"<pre>{latex_content}</pre>"
             
             # Convert PDF to PNG image
-            images = convert_from_path(pdf_path, dpi=300)
+            images = pdf_to_images(pdf_path)
             images[0].save(png_path, "PNG")
             
             # Read image and convert to base64
@@ -254,7 +253,7 @@ if __name__ == '__main__':
     def load_file(file):
         # Read PDF and convert to images (one page one image)
         if file.endswith('.pdf'):
-            pages = convert_from_path(file, dpi=150)
+            pages = pdf_to_images(file)
         else:
             # For image files, read directly as single-page image
             image = Image.open(file)
@@ -313,7 +312,7 @@ if __name__ == '__main__':
             
             # Load parsed layout PDF for preview
             if layout_pdf_path and os.path.exists(layout_pdf_path):
-                pages = convert_from_path(layout_pdf_path, dpi=150)
+                pages = pdf_to_images(layout_pdf_path)
                 pdf_cache["images"] = pages
                 pdf_cache["current_page"] = 0
                 pdf_cache["total_pages"] = len(pages)

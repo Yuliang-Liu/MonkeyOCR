@@ -6,6 +6,8 @@ from io import BytesIO
 from typing import Union
 
 import requests
+import fitz
+from pathlib import Path
 from PIL import Image, ImageFile
 from loguru import logger
 
@@ -47,7 +49,7 @@ def load_image_from_base64(image: Union[bytes, str]) -> Image.Image:
     return Image.open(BytesIO(base64.b64decode(image)))
 
 
-def load_image(image_url: Union[str, Image.Image], max_size = None) -> Image.Image:
+def load_image(image_url: Union[str, Image.Image], max_size: int = None, min_size: int = None) -> Image.Image:
     """load image from url, local path or openai GPT4V."""
     FETCH_TIMEOUT = int(os.environ.get('LMDEPLOY_FETCH_TIMEOUT', 10))
     headers = {
@@ -72,6 +74,12 @@ def load_image(image_url: Union[str, Image.Image], max_size = None) -> Image.Ima
         # check image valid
         img = img.convert('RGB')
 
+        # resize image if too small
+        if min_size and min(img.size) < min_size:
+            scale = min_size / min(img.size)
+            new_size = (int(img.size[0] * scale), int(img.size[1] * scale))
+            img = img.resize(new_size, Image.LANCZOS)
+
         # resize image if too large
         if max_size and max(img.size) > max_size:
             scale = max_size / max(img.size)
@@ -85,3 +93,24 @@ def load_image(image_url: Union[str, Image.Image], max_size = None) -> Image.Ima
         img = Image.new('RGB', (32, 32))
 
     return img
+
+
+def pdf_to_images(pdf_path, dpi=200):
+    """Read PDF from path to a list of PIL images."""
+    doc = fitz.open(pdf_path)
+
+    imgs = []
+    for page_num in range(len(doc)):
+        page = doc.load_page(page_num)
+        zoom = dpi / 72
+        mat = fitz.Matrix(zoom, zoom)
+        pm = page.get_pixmap(matrix=mat, alpha=False)
+
+        # If the width or height exceeds 4500 after scaling, do not scale further.
+        if pm.width > 4500 or pm.height > 4500:
+            pm = doc.get_pixmap(matrix=fitz.Matrix(1, 1), alpha=False)
+
+        img = Image.frombytes('RGB', (pm.width, pm.height), pm.samples)
+        imgs.append(img)
+
+    return imgs

@@ -5,7 +5,7 @@ import time
 import argparse
 import sys
 import torch.distributed as dist
-from pdf2image import convert_from_path
+from magic_pdf.utils.load_image import pdf_to_images
 
 from magic_pdf.data.data_reader_writer import FileBasedDataWriter, FileBasedDataReader
 from magic_pdf.data.dataset import PymuDocDataset, ImageDataset, MultiFileDataset
@@ -343,7 +343,7 @@ def single_task_recognition_multi_file_group(file_paths, output_dir, MonkeyOCR_m
             try:
                 # Convert PDF pages to PIL images directly
                 print(f"Converting PDF pages to images for {file_name}...")
-                images = convert_from_path(file_path, dpi=150)
+                images = pdf_to_images(file_path)
                 print(f"Converted {len(images)} pages to images")
             except Exception as e:
                 raise RuntimeError(f"Failed to convert PDF to images: {str(e)}")
@@ -438,7 +438,7 @@ def single_task_recognition(input_file, output_dir, MonkeyOCR_model, task):
         try:
             # Convert PDF pages to PIL images directly
             print("Converting PDF pages to images...")
-            images = convert_from_path(input_file, dpi=150)
+            images = pdf_to_images(input_file)
             print(f"Converted {len(images)} pages to images")
             
         except Exception as e:

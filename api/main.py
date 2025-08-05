@@ -453,8 +453,8 @@ async def async_single_task_recognition(input_file_path: str, output_dir: str, t
         images = []
         
         if file_extension == 'pdf':
-            from pdf2image import convert_from_path
-            images = convert_from_path(input_file_path, dpi=150)
+            from magic_pdf.utils.load_image import pdf_to_images
+            images = pdf_to_images(input_file_path)
         elif file_extension in ['jpg', 'jpeg', 'png']:
             from PIL import Image
             images = [input_file_path]
