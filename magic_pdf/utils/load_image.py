@@ -108,7 +108,7 @@ def pdf_to_images(pdf_path, dpi=200):
 
         # If the width or height exceeds 4500 after scaling, do not scale further.
         if pm.width > 4500 or pm.height > 4500:
-            pm = doc.get_pixmap(matrix=fitz.Matrix(1, 1), alpha=False)
+            pm = page.get_pixmap(matrix=fitz.Matrix(1, 1), alpha=False)
 
         img = Image.frombytes('RGB', (pm.width, pm.height), pm.samples)
         imgs.append(img)
