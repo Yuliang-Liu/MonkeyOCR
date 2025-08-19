@@ -284,6 +284,7 @@ python parse.py /path/to/folder -g 8 -t text        # Group files for single tas
 python parse.py input.pdf -c model_configs.yaml     # Custom model configuration
 python parse.py /path/to/folder -g 15 -s -o ./out   # Group files, split pages, custom output
 python parse.py input.pdf --pred-abandon            # Enable predicting abandon elements
+  python parse.py /path/to/folder -g 10 -m            # Group files and merge text blocks in output
 ```
 
 </details>

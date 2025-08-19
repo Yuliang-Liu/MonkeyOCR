@@ -1,4 +1,5 @@
 import copy
+import os
 
 from magic_pdf.config.constants import CROSS_PAGE, LINES_DELETED
 from magic_pdf.config.ocr_content_type import BlockType, ContentType
@@ -366,7 +367,8 @@ def para_split(pdf_info_dict):
             block['page_size'] = page['page_size']
         all_blocks.extend(blocks)
 
-    # __para_merge_page(all_blocks)
+    if os.getenv("MERGE_BLOCKS", "0") == "1":
+        __para_merge_page(all_blocks)
     for page_num, page in pdf_info_dict.items():
         page['para_blocks'] = []
         for block in all_blocks:

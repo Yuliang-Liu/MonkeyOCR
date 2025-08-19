@@ -635,6 +635,7 @@ Usage examples:
   python parse.py input.pdf -c model_configs.yaml     # Custom model configuration
   python parse.py /path/to/folder -g 15 -s -o ./out   # Group files, split pages, custom output
   python parse.py input.pdf --pred-abandon            # Enable predicting abandon elements
+  python parse.py /path/to/folder -g 10 -m            # Group files and merge text blocks in output
         """
     )
     
@@ -674,12 +675,21 @@ Usage examples:
     )
 
     parser.add_argument(
+        "-m", "--merge-blocks",
+        action='store_true',
+        help="Merge text blocks in the output (default: False)"
+    )
+
+    parser.add_argument(
         "--pred-abandon",
         action='store_true',
         help="Enable predicting abandon elements like footer and header (default: False)"
     )
     
     args = parser.parse_args()
+
+    if args.merge_blocks:
+        os.environ["MERGE_BLOCKS"] = "1"
     
     MonkeyOCR_model = None
     
