@@ -41,7 +41,8 @@ class ParseResponse(BaseModel):
 monkey_ocr_model = None
 supports_async = False
 model_lock = asyncio.Lock()
-executor = ThreadPoolExecutor(max_workers=4)
+max_workers = int(os.getenv("MAX_WORKERS", 4))
+executor = ThreadPoolExecutor(max_workers=max_workers)
 
 def initialize_model():
     """Initialize MonkeyOCR model"""

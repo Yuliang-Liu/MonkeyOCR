@@ -58,10 +58,10 @@ def atom_model_init(model_name: str, **kwargs):
                 device=kwargs.get('device')
             )
         else:
-            logger.error('layout model name not allow')
+            logger.error('layout model name not allowed')
             exit(1)
     else:
-        logger.error('model name not allow')
+        logger.error('model name not allowed')
         exit(1)
 
     if atom_model is None:

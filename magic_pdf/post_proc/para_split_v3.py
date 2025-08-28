@@ -82,10 +82,10 @@ def __is_list_or_index_block(block):
         last_line = block['lines'][-1]
 
         if page_weight == 0:
-            block_weight_radio = 0
+            block_weight_ratio = 0
         else:
-            block_weight_radio = block_weight / page_weight
-        # logger.info(f"block_weight_radio: {block_weight_radio}")
+            block_weight_ratio = block_weight / page_weight
+        # logger.info(f"block_weight_ratio: {block_weight_ratio}")
 
 
         if (
@@ -135,7 +135,7 @@ def __is_list_or_index_block(block):
                 else:
 
 
-                    if block_weight_radio >= 0.5:
+                    if block_weight_ratio >= 0.5:
                         closed_area = 0.26 * block_weight
                     else:
                         closed_area = 0.36 * block_weight
@@ -193,7 +193,7 @@ def __is_list_or_index_block(block):
             left_close_num >= 2
             and (right_not_close_num >= 2 or line_end_flag or left_not_close_num >= 2)
             and not multiple_para_flag
-            # and block_weight_radio > 0.27
+            # and block_weight_ratio > 0.27
         ):
 
             if left_close_num / len(block['lines']) > 0.8:
