@@ -119,18 +119,24 @@ class MonkeyOCR:
                 )
         if chat_backend == 'lmdeploy':
             logger.info('Use LMDeploy as backend')
-            self.chat_model = MonkeyChat_LMDeploy(chat_path)
+            dp = self.chat_config.get('data_parallelism', 1)
+            tp = self.chat_config.get('model_parallelism', 1)
+            self.chat_model = MonkeyChat_LMDeploy(chat_path, dp=dp, tp=tp)
         elif chat_backend == 'lmdeploy_queue':
             logger.info('Use LMDeploy Queue as backend')
+            dp = self.chat_config.get('data_parallelism', 1)
+            tp = self.chat_config.get('model_parallelism', 1)
             queue_config = self.chat_config.get('queue_config', {})
-            self.chat_model = MonkeyChat_LMDeploy_queue(chat_path, **queue_config)
+            self.chat_model = MonkeyChat_LMDeploy_queue(chat_path, dp=dp, tp=tp, **queue_config)
         elif chat_backend == 'vllm':
             logger.info('Use vLLM as backend')
-            self.chat_model = MonkeyChat_vLLM(chat_path)
+            tp = self.chat_config.get('model_parallelism', 1)
+            self.chat_model = MonkeyChat_vLLM(chat_path, tp=tp)
         elif chat_backend == 'vllm_queue':
             logger.info('Use vLLM Queue as backend')
+            tp = self.chat_config.get('model_parallelism', 1)
             queue_config = self.chat_config.get('queue_config', {})
-            self.chat_model = MonkeyChat_vLLM_queue(chat_path, **queue_config)
+            self.chat_model = MonkeyChat_vLLM_queue(chat_path, tp=tp, **queue_config)
         elif chat_backend == 'transformers':
             logger.info('Use transformers as backend')
             batch_size = self.chat_config.get('batch_size', 5)
@@ -151,21 +157,21 @@ class MonkeyOCR:
         logger.info(f'VLM loaded: {self.chat_model.model_name}')
 
 class MonkeyChat_LMDeploy:
-    def __init__(self, model_path, engine_config=None): 
+    def __init__(self, model_path, dp=1, tp=1): 
         try:
-            from lmdeploy import pipeline, GenerationConfig, PytorchEngineConfig, ChatTemplateConfig, TurbomindEngineConfig
+            from lmdeploy import pipeline, GenerationConfig, ChatTemplateConfig
         except ImportError:
             raise ImportError("LMDeploy is not installed. Please install it following: "
-                              "https://github.com/Yuliang-Liu/MonkeyOCR/blob/main/docs/install_cuda.md "
+                              "https://github.com/Yuliang-Liu/MonkeyOCR/blob/main/docs/install_cuda_pp.md "
                               "to use MonkeyChat_LMDeploy.")
         self.model_name = os.path.basename(model_path)
-        self.engine_config = self._auto_config_dtype(engine_config, PytorchEngineConfig)
+        self.engine_config = self._auto_config_dtype(dp=dp, tp=tp)
         self.pipe = pipeline(model_path, backend_config=self.engine_config, chat_template_config=ChatTemplateConfig('qwen2d5-vl'))
         self.gen_config=GenerationConfig(max_new_tokens=4096,do_sample=True,temperature=0,repetition_penalty=1.05)
 
-    def _auto_config_dtype(self, engine_config=None, EngineConfig=None):
-        if engine_config is None:
-            engine_config = EngineConfig(session_len=10240)
+    def _auto_config_dtype(self, dp=1, tp=1):
+        from lmdeploy import PytorchEngineConfig
+        engine_config = PytorchEngineConfig(session_len=10240, dp=dp, tp=tp)
         dtype = "bfloat16"
         if torch.cuda.is_available():
             device = torch.cuda.current_device()
@@ -184,18 +190,19 @@ class MonkeyChat_LMDeploy:
         return [output.text for output in outputs]
     
 class MonkeyChat_vLLM:
-    def __init__(self, model_path):
+    def __init__(self, model_path, tp=1):
         try:
             from vllm import LLM, SamplingParams
         except ImportError:
             raise ImportError("vLLM is not installed. Please install it following: "
-                              "https://github.com/Yuliang-Liu/MonkeyOCR/blob/main/docs/install_cuda.md "
+                              "https://github.com/Yuliang-Liu/MonkeyOCR/blob/main/docs/install_cuda_pp.md "
                                "to use MonkeyChat_vLLM.")
         self.model_name = os.path.basename(model_path)
         self.pipe = LLM(model=model_path,
                         max_seq_len_to_capture=10240,
                         mm_processor_kwargs={'use_fast': True},
-                        gpu_memory_utilization=self._auto_gpu_mem_ratio(0.9))
+                        gpu_memory_utilization=self._auto_gpu_mem_ratio(0.9),
+                        tensor_parallel_size=tp)
         self.gen_config = SamplingParams(max_tokens=4096,temperature=0,repetition_penalty=1.05)
     
     def _auto_gpu_mem_ratio(self, ratio):
@@ -226,7 +233,7 @@ class MonkeyChat_transformers:
             from transformers import Qwen2_5_VLForConditionalGeneration, AutoProcessor
         except ImportError:
             raise ImportError("transformers is not installed. Please install it following: "
-                              "https://github.com/Yuliang-Liu/MonkeyOCR/blob/main/docs/install_cuda.md "
+                              "https://github.com/Yuliang-Liu/MonkeyOCR/blob/main/docs/install_cuda_pp.md "
                               "to use MonkeyChat_transformers.")
         self.model_name = os.path.basename(model_path)
         self.max_batch_size = max_batch_size
@@ -490,15 +497,15 @@ class MonkeyChat_LMDeploy_queue:
     5. Uses LMDeploy's efficient pipeline for batch processing
     """
     
-    def __init__(self, model_path, max_batch_size=32, queue_timeout=0.1, max_queue_size=1000, engine_config=None):
+    def __init__(self, model_path, dp=1, tp=1, max_batch_size=32, queue_timeout=0.1, max_queue_size=1000):
         try:
-            from lmdeploy import pipeline, GenerationConfig, PytorchEngineConfig, ChatTemplateConfig
+            from lmdeploy import pipeline, GenerationConfig, ChatTemplateConfig
             import asyncio
             import threading
             from collections import deque
         except ImportError:
             raise ImportError("LMDeploy is not installed. Please install it following: "
-                              "https://github.com/Yuliang-Liu/MonkeyOCR/blob/main/docs/install_cuda.md")
+                              "https://github.com/Yuliang-Liu/MonkeyOCR/blob/main/docs/install_cuda_pp.md")
         
         self.model_name = os.path.basename(model_path)
         self.max_batch_size = max_batch_size
@@ -510,7 +517,7 @@ class MonkeyChat_LMDeploy_queue:
             torch.cuda.empty_cache()
         
         # Initialize LMDeploy pipeline (for efficient batch processing)
-        self.engine_config = self._auto_config_dtype(engine_config, PytorchEngineConfig)
+        self.engine_config = self._auto_config_dtype(dp=dp, tp=tp)
         self.pipe = pipeline(
             model_path, 
             backend_config=self.engine_config, 
@@ -538,10 +545,10 @@ class MonkeyChat_LMDeploy_queue:
         logger.info(f"LMDeploy MultiUser engine initialized for model: {self.model_name}")
         logger.info(f"Max batch size: {max_batch_size}, Queue timeout: {queue_timeout}s")
     
-    def _auto_config_dtype(self, engine_config=None, PytorchEngineConfig=None):
+    def _auto_config_dtype(self, dp=1, tp=1):
         """Auto configure dtype based on GPU capability"""
-        if engine_config is None:
-            engine_config = PytorchEngineConfig(session_len=10240)
+        from lmdeploy import PytorchEngineConfig
+        engine_config = PytorchEngineConfig(session_len=10240, dp=dp, tp=tp)
         dtype = "bfloat16"
         if torch.cuda.is_available():
             device = torch.cuda.current_device()
@@ -860,15 +867,14 @@ class MonkeyChat_vLLM_queue:
     4. Achieves inference speed close to MonkeyChat_vLLM
     """
     
-    def __init__(self, model_path, max_batch_size=64, queue_timeout=0.1, max_queue_size=1000):
+    def __init__(self, model_path, tp=1, max_batch_size=64, queue_timeout=0.1, max_queue_size=1000):
         try:
             from vllm import LLM, SamplingParams
-            import asyncio
             import threading
             from collections import deque
         except ImportError:
             raise ImportError("vLLM is not installed. Please install it following: "
-                              "https://github.com/Yuliang-Liu/MonkeyOCR/blob/main/docs/install_cuda.md")
+                              "https://github.com/Yuliang-Liu/MonkeyOCR/blob/main/docs/install_cuda_pp.md")
         
         self.model_name = os.path.basename(model_path)
         self.max_batch_size = max_batch_size
@@ -882,6 +888,7 @@ class MonkeyChat_vLLM_queue:
             mm_processor_kwargs={'use_fast': True},
             gpu_memory_utilization=self._auto_gpu_mem_ratio(0.9),
             max_num_seqs=max_batch_size * 2,  # Allow larger sequence numbers
+            tensor_parallel_size=tp
         )
         
         self.gen_config = SamplingParams(
