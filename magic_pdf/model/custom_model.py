@@ -13,6 +13,7 @@ from PIL import Image
 from typing import List, Union
 from openai import OpenAI
 import asyncio
+import uuid
 
 
 class MonkeyOCR:
@@ -678,10 +679,6 @@ class MonkeyChat_LMDeploy_queue:
     
     async def async_single_inference(self, image: str, question: str) -> str:
         """Asynchronous single inference"""
-        import asyncio
-        import concurrent.futures
-        import uuid
-        
         request_id = f"lmdeploy_multiuser_{uuid.uuid4().hex[:8]}"
         
         # Create future to receive result
@@ -1044,10 +1041,6 @@ class MonkeyChat_vLLM_queue:
                 
     async def async_single_inference(self, image: str, question: str) -> str:
         """Asynchronous single inference"""
-        import asyncio
-        import concurrent.futures
-        import uuid
-        
         request_id = f"vllm_multiuser_{uuid.uuid4().hex[:8]}"
         
         # Create future to receive result
