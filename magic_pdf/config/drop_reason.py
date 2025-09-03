@@ -1,5 +1,5 @@
 class DropReason:
-    TEXT_BLCOK_HOR_OVERLAP = 'text_block_horizontal_overlap'
+    TEXT_BLOCK_HOR_OVERLAP = 'text_block_horizontal_overlap'
     USEFUL_BLOCK_HOR_OVERLAP = (
         'useful_block_horizontal_overlap'
     )

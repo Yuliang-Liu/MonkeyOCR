@@ -78,14 +78,14 @@ def _right_intersect(left_box, right_box):
                                             or y0_1 <= y1_2 <= y1_1)
 
 
-def _is_vertical_full_overlap(box1, box2, x_torlence=2):
+def _is_vertical_full_overlap(box1, box2, x_tolerance=2):
 
     x11, y11, x12, y12 = box1
     x21, y21, x22, y22 = box2
 
 
-    contains_in_x = (x11 - x_torlence <= x21 and x12 + x_torlence >= x22) or (
-        x21 - x_torlence <= x11 and x22 + x_torlence >= x12)
+    contains_in_x = (x11 - x_tolerance <= x21 and x12 + x_tolerance >= x22) or (
+        x21 - x_tolerance <= x11 and x22 + x_tolerance >= x12)
 
 
     overlap_in_y = not (y12 < y21 or y11 > y22)
