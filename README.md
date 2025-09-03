@@ -318,7 +318,7 @@ uvicorn api.main:app --port 8000
 ```
 Once the API service is running, you can access the API documentation at http://localhost:8000/docs to explore available endpoints.
 > [!TIP]
-> To improve API concurrency performance, consider configuring the inference backend as `lmdeploy_queue` or `vllm_queue`.
+> To improve API concurrency performance, consider configuring the inference backend as `vllm_async`.
 
 ## Docker Deployment
 

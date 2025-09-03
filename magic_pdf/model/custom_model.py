@@ -4,6 +4,7 @@ import torch
 from magic_pdf.config.constants import *
 from magic_pdf.model.sub_modules.model_init import AtomModelSingleton
 from magic_pdf.model.model_list import AtomicModel
+from magic_pdf.model.async_vllm import MonkeyChat_vLLM_async
 from magic_pdf.utils.load_image import load_image, encode_image_base64
 from transformers import LayoutLMv3ForTokenClassification
 from loguru import logger
@@ -130,7 +131,11 @@ class MonkeyOCR:
         elif chat_backend == 'vllm_queue':
             logger.info('Use vLLM Queue as backend')
             queue_config = self.chat_config.get('queue_config', {})
-            self.chat_model = MonkeyChat_vLLM_queue(chat_path, **queue_config)
+            self.chat_model = MonkeyChat_vLLM_queue(chat_path, tp=tp, **queue_config)
+        elif chat_backend == 'vllm_async':
+            logger.info('Use vLLM Async as backend')
+            tp = self.chat_config.get('model_parallelism', 1)
+            self.chat_model = MonkeyChat_vLLM_async(chat_path, tp=tp)
         elif chat_backend == 'transformers':
             logger.info('Use transformers as backend')
             batch_size = self.chat_config.get('batch_size', 5)

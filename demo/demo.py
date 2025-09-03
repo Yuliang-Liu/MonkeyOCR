@@ -12,6 +12,7 @@ if __name__ == "__main__":
     MonkeyOCR_model = MonkeyOCR('model_configs.yaml')
 
     total_time = 0
+    # for i in range(1,9):
     pdf_file_name = f"demo/demo1.pdf"  # replace with the real pdf path
     name_without_suff = '.'.join(os.path.basename(pdf_file_name).split(".")[:-1])
 
@@ -42,8 +43,9 @@ if __name__ == "__main__":
     ## pipeline
     pipe_result = infer_result.pipe_ocr_mode(image_writer, MonkeyOCR_model=MonkeyOCR_model)
     single_time = time.time() - t1
+    total_time += single_time
     print(f"parsing time: {single_time:.2f}s")
-
+    print(f"total time: {total_time:.2f}s")
     infer_result.draw_model(os.path.join(local_md_dir, f"{name_without_suff}_model.pdf"))
 
     ### get model inference result
