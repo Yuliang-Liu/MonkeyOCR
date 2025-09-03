@@ -120,16 +120,22 @@ class MonkeyOCR:
                 )
         if chat_backend == 'lmdeploy':
             logger.info('Use LMDeploy as backend')
-            self.chat_model = MonkeyChat_LMDeploy(chat_path)
+            dp = self.chat_config.get('data_parallelism', 1)
+            tp = self.chat_config.get('model_parallelism', 1)
+            self.chat_model = MonkeyChat_LMDeploy(chat_path, dp=dp, tp=tp)
         elif chat_backend == 'lmdeploy_queue':
             logger.info('Use LMDeploy Queue as backend')
+            dp = self.chat_config.get('data_parallelism', 1)
+            tp = self.chat_config.get('model_parallelism', 1)
             queue_config = self.chat_config.get('queue_config', {})
-            self.chat_model = MonkeyChat_LMDeploy_queue(chat_path, **queue_config)
+            self.chat_model = MonkeyChat_LMDeploy_queue(chat_path, dp=dp, tp=tp, **queue_config)
         elif chat_backend == 'vllm':
             logger.info('Use vLLM as backend')
-            self.chat_model = MonkeyChat_vLLM(chat_path)
+            tp = self.chat_config.get('model_parallelism', 1)
+            self.chat_model = MonkeyChat_vLLM(chat_path, tp=tp)
         elif chat_backend == 'vllm_queue':
             logger.info('Use vLLM Queue as backend')
+            tp = self.chat_config.get('model_parallelism', 1)
             queue_config = self.chat_config.get('queue_config', {})
             self.chat_model = MonkeyChat_vLLM_queue(chat_path, tp=tp, **queue_config)
         elif chat_backend == 'vllm_async':
