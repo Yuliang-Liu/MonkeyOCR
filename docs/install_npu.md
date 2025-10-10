@@ -33,7 +33,14 @@ pip install opencv-python-headless==4.11.0.86
 # step3:修改model_config.yaml配置
 ```
 device: npu
-...
+weights:
+  doclayout_yolo: Structure/doclayout_yolo_docstructbench_imgsz1280_2501.pt # or Structure/layout_zh.pt
+  # PP-DocLayout_plus-L: Structure/PP-DocLayout_plus-L
+  layoutreader: Relation
+layout_config:
+  model: doclayout_yolo # PP-DocLayout_plus-L (MonkeyOCR-pro, npu不支持) / doclayout_yolo (MonkeyOCR)
+  reader:
+      name: layoutreader
 models_dir: /root/.cache
 chat_config:
   weight_path: /root/.cache/Recognition
