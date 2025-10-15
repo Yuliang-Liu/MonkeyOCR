@@ -172,7 +172,7 @@ class MonkeyChat_LMDeploy:
                               "to use MonkeyChat_LMDeploy.")
         self.model_name = os.path.basename(model_path)
         self.engine_config = self._auto_config_dtype(dp=dp, tp=tp)
-        self.pipe = pipeline(model_path, backend_config=self.engine_config, chat_template_config=ChatTemplateConfig('qwen2d5-vl'))
+        self.pipe = pipeline(model_path, backend_config=self.engine_config, chat_template_config=ChatTemplateConfig(model_path))
         self.gen_config=GenerationConfig(max_new_tokens=4096,do_sample=True,temperature=0,repetition_penalty=1.05)
 
     def _auto_config_dtype(self, dp=1, tp=1):
@@ -527,7 +527,7 @@ class MonkeyChat_LMDeploy_queue:
         self.pipe = pipeline(
             model_path, 
             backend_config=self.engine_config, 
-            chat_template_config=ChatTemplateConfig('qwen2d5-vl')
+            chat_template_config=ChatTemplateConfig(model_path)
         )
         
         self.gen_config = GenerationConfig(
