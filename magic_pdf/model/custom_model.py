@@ -120,35 +120,35 @@ class MonkeyOCR:
                     "Please run 'python tools/download_model.py' to download the required models."
                 )
         if chat_backend == 'lmdeploy':
-            logger.info('Use LMDeploy as backend')
+            logger.info('using backend: LMDeploy')
             dp = self.chat_config.get('data_parallelism', 1)
             tp = self.chat_config.get('model_parallelism', 1)
             self.chat_model = MonkeyChat_LMDeploy(chat_path, dp=dp, tp=tp)
         elif chat_backend == 'lmdeploy_queue':
-            logger.info('Use LMDeploy Queue as backend')
+            logger.info('using backend: LMDeploy Queue')
             dp = self.chat_config.get('data_parallelism', 1)
             tp = self.chat_config.get('model_parallelism', 1)
             queue_config = self.chat_config.get('queue_config', {})
             self.chat_model = MonkeyChat_LMDeploy_queue(chat_path, dp=dp, tp=tp, **queue_config)
         elif chat_backend == 'vllm':
-            logger.info('Use vLLM as backend')
+            logger.info('using backend: vLLM')
             tp = self.chat_config.get('model_parallelism', 1)
             self.chat_model = MonkeyChat_vLLM(chat_path, tp=tp)
         elif chat_backend == 'vllm_queue':
-            logger.info('Use vLLM Queue as backend')
+            logger.info('using backend: vLLM Queue')
             tp = self.chat_config.get('model_parallelism', 1)
             queue_config = self.chat_config.get('queue_config', {})
             self.chat_model = MonkeyChat_vLLM_queue(chat_path, tp=tp, **queue_config)
         elif chat_backend == 'vllm_async':
-            logger.info('Use vLLM Async as backend')
+            logger.info('using backend: vLLM Async')
             tp = self.chat_config.get('model_parallelism', 1)
             self.chat_model = MonkeyChat_vLLM_async(chat_path, tp=tp)
         elif chat_backend == 'transformers':
-            logger.info('Use transformers as backend')
+            logger.info('using backend: transformers')
             batch_size = self.chat_config.get('batch_size', 5)
             self.chat_model = MonkeyChat_transformers(chat_path, batch_size, device=self.device)
         elif chat_backend == 'api':
-            logger.info('Use API as backend')
+            logger.info('using backend: API')
             api_config = self.configs.get('api_config', {})
             if not api_config:
                 raise ValueError("API configuration is required for API backend.")
@@ -158,9 +158,9 @@ class MonkeyOCR:
                 api_key=api_config.get('api_key', None)
             )
         else:
-            logger.warning('Use LMDeploy as default backend')
+            logger.warning('using backend: LMDeploy (default)')
             self.chat_model = MonkeyChat_LMDeploy(chat_path)
-        logger.info(f'VLM loaded: {self.chat_model.model_name}')
+        logger.info(f'LMM loaded: {self.chat_model.model_name}')
 
 class MonkeyChat_LMDeploy:
     def __init__(self, model_path, dp=1, tp=1): 
@@ -172,7 +172,10 @@ class MonkeyChat_LMDeploy:
                               "to use MonkeyChat_LMDeploy.")
         self.model_name = os.path.basename(model_path)
         self.engine_config = self._auto_config_dtype(dp=dp, tp=tp)
-        self.pipe = pipeline(model_path, backend_config=self.engine_config, chat_template_config=ChatTemplateConfig('qwen2d5-vl'))
+        self.pipe = pipeline(model_path,
+                             backend_config=self.engine_config,
+                             chat_template_config=ChatTemplateConfig('qwen2d5-vl'),
+                             log_level='ERROR')
         self.gen_config=GenerationConfig(max_new_tokens=4096,do_sample=True,temperature=0,repetition_penalty=1.05)
 
     def _auto_config_dtype(self, dp=1, tp=1):
@@ -192,7 +195,7 @@ class MonkeyChat_LMDeploy:
     
     def batch_inference(self, images, questions):
         inputs = [(question, load_image(image, max_size=1600)) for image, question in zip(images, questions)]
-        outputs = self.pipe(inputs, gen_config=self.gen_config)
+        outputs = self.pipe(inputs, gen_config=self.gen_config, use_tqdm=True)
         return [output.text for output in outputs]
     
 class MonkeyChat_vLLM:
@@ -524,11 +527,10 @@ class MonkeyChat_LMDeploy_queue:
         
         # Initialize LMDeploy pipeline (for efficient batch processing)
         self.engine_config = self._auto_config_dtype(dp=dp, tp=tp)
-        self.pipe = pipeline(
-            model_path, 
-            backend_config=self.engine_config, 
-            chat_template_config=ChatTemplateConfig('qwen2d5-vl')
-        )
+        self.pipe = pipeline(model_path,
+                             backend_config=self.engine_config,
+                             chat_template_config=ChatTemplateConfig('qwen2d5-vl'),
+                             log_level='ERROR')
         
         self.gen_config = GenerationConfig(
             max_new_tokens=4096,
