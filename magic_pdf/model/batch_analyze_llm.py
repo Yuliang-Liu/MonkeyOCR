@@ -60,8 +60,8 @@ class BatchAnalyzeLLM:
 
         clean_vram(self.model.device, vram_threshold=8)
 
-        llm_ocr_start = time.time()
-        logger.info('VLM OCR start...')
+        lmm_ocr_start = time.time()
+        logger.info('LMM OCR start (done/total text blocks):')
         # Check if split_pages is True and handle pages without valid cids
         if split_pages or len(images) == 1:
             cid2instruction = [0, 1, 4, 5, 6, 7, 8, 14, 101]
@@ -123,7 +123,7 @@ class BatchAnalyzeLLM:
             new_images_all.extend(new_images)
             cids_all.extend(cids)
             page_idxs.append(len(new_images_all) - len(new_images))
-        ocr_result = self.batch_llm_ocr(new_images_all, cids_all)
+        ocr_result = self.batch_lmm_ocr(new_images_all, cids_all)
         for index in range(len(images)):
             ocr_results = []
             layout_res = images_layout_res[index]
@@ -151,14 +151,13 @@ class BatchAnalyzeLLM:
                 elif res['category_id'] == 200:
                     res['category_id'] = 1
             layout_res.extend(ocr_results)
-            logger.info(f'OCR processed images / total images: {index+1} / {len(images)}')
         logger.info(
-            f'llm ocr time: {round(time.time() - llm_ocr_start, 2)}, image num: {len(images)}'
+            f'LMM ocr time: {round(time.time() - lmm_ocr_start, 2)}, image num: {len(images)}'
         )
 
         return images_layout_res
 
-    def batch_llm_ocr(self, images, cat_ids, version='lmdeploy'):
+    def batch_lmm_ocr(self, images, cat_ids, version='lmdeploy'):
         def sanitize_md(output):
             return output.replace('<md>', '').replace('</md>', '').replace('md\n','').strip()
         def sanitize_mf(output:str):
@@ -189,41 +188,16 @@ class BatchAnalyzeLLM:
         messages = []
         ignore_idx = []
         outs = []
-        if version in ['vllm', 'lmdeploy']:
-            for i in range(len(images)):
-                if cat_ids[i] not in cid2instruction:
-                    ignore_idx.append(i)
-                    continue
-                new_images.append(images[i])
-                messages.append(cid2instruction[cat_ids[i]])
-            if len(new_images) == 0:
-                return [''] * len(images)
-            out = self.model.chat_model.batch_inference(new_images, messages)
-            outs.extend(out)
-        else:
-            buffer = BytesIO()
-            for i in range(len(images)):
-                if cat_ids[i] not in cid2instruction:
-                    ignore_idx.append(i)
-                    continue
-                images[i].save(buffer, format='JPEG')
-                image_base64 = base64.b64encode(buffer.getvalue()).decode('utf-8')
-                messages.append(
-                    [{
-                        "role": "user",
-                        "content": [
-                            {
-                                "type": "image",
-                                "image": "data:image/jpeg;base64," + image_base64,
-                            },
-                            {"type": "text", "text": "{}".format(cid2instruction[cat_ids[i]])},
-                        ],
-                    },]
-                )
-                buffer.seek(0)
-                buffer.truncate(0)
-                # if len(messages) == max_batch_size or i == len(images) - 1:
-            outs.extend(self.model.llm_model.batch_inference(messages))
+        for i in range(len(images)):
+            if cat_ids[i] not in cid2instruction:
+                ignore_idx.append(i)
+                continue
+            new_images.append(images[i])
+            messages.append(cid2instruction[cat_ids[i]])
+        if len(new_images) == 0:
+            return [''] * len(images)
+        out = self.model.chat_model.batch_inference(new_images, messages)
+        outs.extend(out)
         for j in ignore_idx:
             outs.insert(j, '')
         messages.clear()
