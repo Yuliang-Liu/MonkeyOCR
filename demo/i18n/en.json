@@ -1,6 +1,6 @@
 {
-  "title": "Optical Character Recognition Service",
-  "subtitle": "武汉中交交通工程有限责任公司",
+  "title": "MonkeyOCR",
+  "subtitle": "Optical Character Recognition Service",
   "upload_section": "Upload PDF/Image",
   "select_file": "Select File",
   "select_prompt": "Select Prompt",

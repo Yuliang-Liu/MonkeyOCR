@@ -26,6 +26,14 @@ def load_i18n(lang='en'):
         with open(os.path.join(i18n_dir, 'en.json'), 'r', encoding='utf-8') as f:
             return json.load(f)
 
+def get_instructions(texts):
+    return [
+        texts['prompt_text_content'],
+        texts['prompt_formula'],
+        texts['prompt_table_html'],
+        texts['prompt_table_latex']
+    ]
+
 if __name__ == '__main__':
     if gr.NO_RELOAD:
         MonkeyOCR_model = MonkeyOCR('model_configs.yaml')
@@ -494,7 +502,7 @@ if __name__ == '__main__':
                 pdf_download_button, md_download_button, lang_switch
             ]
         )
-        
+
         # Event handling
         # Show PDF preview on file upload
         pdf_input.upload(
