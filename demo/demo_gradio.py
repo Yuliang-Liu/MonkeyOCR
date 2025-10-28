@@ -7,6 +7,7 @@ import zipfile
 import subprocess
 import tempfile
 import uuid
+import json
 
 from magic_pdf.data.data_reader_writer import FileBasedDataWriter, FileBasedDataReader
 from magic_pdf.data.dataset import PymuDocDataset, ImageDataset
@@ -15,10 +16,23 @@ from magic_pdf.model.custom_model import MonkeyOCR
 from PIL import Image
 from loguru import logger
 
+def load_i18n(lang='en'):
+    i18n_dir = os.path.join(os.path.dirname(__file__), 'i18n')
+    i18n_file = os.path.join(i18n_dir, f'{lang}.json')
+    try:
+        with open(i18n_file, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except FileNotFoundError:
+        with open(os.path.join(i18n_dir, 'en.json'), 'r', encoding='utf-8') as f:
+            return json.load(f)
+
 if __name__ == '__main__':
     if gr.NO_RELOAD:
         MonkeyOCR_model = MonkeyOCR('model_configs.yaml')
 
+    current_lang = gr.State('en')
+    i18n_texts = gr.State(load_i18n('en'))
+    
     def render_latex_table_to_image(latex_content, temp_dir):
         """
         Render LaTeX table to image and return base64 encoding
@@ -363,6 +377,28 @@ if __name__ == '__main__':
     instruction_table_html = f'''This is the image of a table. Please output the table in html format.'''
     instruction_table_latex = f'''Please output the table in the image in LaTeX format.'''
 
+    def switch_language(lang):
+        texts = load_i18n(lang)
+        instructions = get_instructions(texts)
+        return (
+            texts,
+            gr.update(choices=instructions, value=instructions[0], label=texts['select_prompt']),
+            gr.update(value=f"<div style=\"display: flex; align-items: center; justify-content: center; margin-bottom: 20px;\"><h1 style=\"margin: 0; font-size: 2em;\">{texts['title']}</h1></div><div style=\"text-align: center; margin-bottom: 10px;\"><em>{texts['subtitle']}</em></div>"),
+            gr.update(value=f"### {texts['upload_section']}"),
+            gr.update(label=texts['select_file']),
+            gr.update(value=f"### {texts['actions_section']}"),
+            gr.update(value=texts['parse_button']),
+            gr.update(value=texts['chat_button']),
+            gr.update(value=texts['clear_button']),
+            gr.update(value=f"### {texts['file_preview']}"),
+            gr.update(value=texts['prev_page']),
+            gr.update(value=texts['next_page']),
+            gr.update(value=f"### {texts['result_display']}"),
+            gr.update(value=texts['download_pdf_layout']),
+            gr.update(value=texts['download_markdown']),
+            gr.update(label=texts['language'])
+        )
+    
     css = """
     #page_info_html {
         display: flex;
@@ -394,50 +430,71 @@ if __name__ == '__main__':
     """
 
     with gr.Blocks(theme="ocean", css=css, title='MonkeyOCR') as demo:
-        gr.HTML("""
+        texts = load_i18n('en')
+        instructions = get_instructions(texts)
+        
+        title_html = gr.HTML(f"""
             <div style="display: flex; align-items: center; justify-content: center; margin-bottom: 20px;">
-                <h1 style="margin: 0; font-size: 2em;">MonkeyOCR</h1>
+                <h1 style="margin: 0; font-size: 2em;">{texts['title']}</h1>
             </div>
             <div style="text-align: center; margin-bottom: 10px;">
-                <em>Supports PDF parse, image parse, and Q&A</em>
+                <em>{texts['subtitle']}</em>
             </div>
         """)
 
         with gr.Row():
             with gr.Column(scale=1, variant="compact"):
-                gr.Markdown("### 📥 Upload PDF/Image (上传PDF/Image)")
-                pdf_input = gr.File(label="Select File (选择文件)", type="filepath", file_types=[".pdf", ".jpg", ".jpeg", ".png"], show_label=True)
-                chat_input = gr.Dropdown(label="Select Prompt (选择Prompt)", choices=[instruction, instruction_mf, instruction_table_html, instruction_table_latex], value=instruction, show_label=True, multiselect=False, visible=True)
-                gr.Markdown("### ⚙️ Actions (操作)")
-                parse_button = gr.Button("🔍 Parse (解析)", variant="primary")
-                chat_button = gr.Button("💬 Chat (对话)", variant="secondary")
-                clear_button = gr.Button("🗑️ Clear (清除)", variant="huggingface")
+                upload_section = gr.Markdown(f"### {texts['upload_section']}")
+                pdf_input = gr.File(label=texts['select_file'], type="filepath", file_types=[".pdf", ".jpg", ".jpeg", ".png"], show_label=True)
+                chat_input = gr.Dropdown(label=texts['select_prompt'], choices=instructions, value=instructions[0], show_label=True, multiselect=False, visible=True)
+                actions_section = gr.Markdown(f"### {texts['actions_section']}")
+                parse_button = gr.Button(texts['parse_button'], variant="primary")
+                chat_button = gr.Button(texts['chat_button'], variant="secondary")
+                clear_button = gr.Button(texts['clear_button'], variant="huggingface")
+                
+                lang_switch = gr.Dropdown(
+                    label=texts['language'],
+                    choices=[("English", "en"), ("中文", "zh")],
+                    value="en",
+                    show_label=True
+                )
 
             with gr.Column(scale=6, variant="compact"):
                 with gr.Row():
                     with gr.Column(scale=3):
-                        gr.Markdown("### 👁️ File Preview (文件预览)")
-                        pdf_view = gr.Image(label="PDF Preview (PDF预览)", visible=True, height=800, show_label=False)
+                        file_preview_section = gr.Markdown(f"### {texts['file_preview']}")
+                        pdf_view = gr.Image(label=texts['pdf_preview'], visible=True, height=800, show_label=False)
                         with gr.Row():
-                            prev_btn = gr.Button("⬅ Prev Page (上一页)")
+                            prev_btn = gr.Button(texts['prev_page'])
                             page_info = gr.HTML(value="<div id='page_info_box'>0 / 0</div>", elem_id="page_info_html")
-                            next_btn = gr.Button("(下一页) Next Page ➡")
+                            next_btn = gr.Button(texts['next_page'])
                     with gr.Column(scale=3):
-                        gr.Markdown("### ✔️ Result Display (结果展示)")
+                        result_display_section = gr.Markdown(f"### {texts['result_display']}")
                         with gr.Tabs(elem_id="markdown_tabs"):
-                            with gr.TabItem("Markdown Render Preview (Markdown渲染预览)"):
-                                md_view = gr.Markdown(value="## Please click the parse button to parse or click chat for single-task recognition...", label="Markdown Preview (Markdown预览)", max_height=600, latex_delimiters=[
+                            with gr.TabItem(texts['markdown_render_preview']):
+                                md_view = gr.Markdown(value=texts['please_click_parse'], label=texts['markdown_render_preview'], max_height=600, latex_delimiters=[
                                     {"left": "$$", "right": "$$", "display": True},
                                     {"left": "$", "right": "$", "display": False},
                                 ], show_copy_button=False, elem_id="markdown_output")
-                            with gr.TabItem("Markdown Raw Text (Markdown原始文本)"):
-                                md_raw = gr.Textbox(value="🕐 Waiting for parsing result...", label="Markdown Raw Text (Markdown原始文本)", max_lines=100, lines=38, show_copy_button=True, elem_id="markdown_output", show_label=False)
+                            with gr.TabItem(texts['markdown_raw_text']):
+                                md_raw = gr.Textbox(value=texts['waiting_for_parsing'], label=texts['markdown_raw_text'], max_lines=100, lines=38, show_copy_button=True, elem_id="markdown_output", show_label=False)
                 with gr.Row():
                     with gr.Column(scale=3):
-                        pdf_download_button = gr.DownloadButton("⬇️ Download PDF Layout (下载PDF Layout)", visible=True)
+                        pdf_download_button = gr.DownloadButton(texts['download_pdf_layout'], visible=True)
                     with gr.Column(scale=3):
-                        md_download_button = gr.DownloadButton("⬇️ Download Markdown (下载Markdown)", visible=True)
+                        md_download_button = gr.DownloadButton(texts['download_markdown'], visible=True)
 
+        lang_switch.change(
+            fn=switch_language,
+            inputs=lang_switch,
+            outputs=[
+                i18n_texts, chat_input, title_html, upload_section, pdf_input, 
+                actions_section, parse_button, chat_button, clear_button,
+                file_preview_section, prev_btn, next_btn, result_display_section,
+                pdf_download_button, md_download_button, lang_switch
+            ]
+        )
+        
         # Event handling
         # Show PDF preview on file upload
         pdf_input.upload(
