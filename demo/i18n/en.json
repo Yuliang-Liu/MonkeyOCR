@@ -23,5 +23,11 @@
   "prompt_text_content": "Please output the text content from the image.",
   "prompt_formula": "Please write out the expression of the formula in the image using LaTeX format.",
   "prompt_table_html": "This is the image of a table. Please output the table in html format.",
-  "prompt_table_latex": "Please output the table in the image in LaTeX format."
+  "prompt_table_latex": "Please output the table in the image in LaTeX format.",
+  "error_no_file_uploaded": "Please upload an image or PDF file before chatting.",
+  "error_pdf_chat_not_supported": "Only image chat is supported, PDF file chat is not supported.",
+  "error_chat_processing": "Chat processing error: ",
+  "error_please_upload_pdf": "Please upload a PDF file",
+  "warning_parse_failed_switching_chat": "Parsing failed, switching to chat mode for direct recognition...",
+  "page_separator": " / "
 }

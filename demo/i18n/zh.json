@@ -23,5 +23,11 @@
   "prompt_text_content": "请输出图片中的文本内容。",
   "prompt_formula": "请用LaTeX格式写出图片中公式的表达式。",
   "prompt_table_html": "这是一个表格的图片。请以html格式输出表格。",
-  "prompt_table_latex": "请以LaTeX格式输出图片中的表格。"
+  "prompt_table_latex": "请以LaTeX格式输出图片中的表格。",
+  "error_no_file_uploaded": "请先上传图片或PDF文件。",
+  "error_pdf_chat_not_supported": "仅支持图片对话，不支持PDF文件对话。",
+  "error_chat_processing": "对话处理错误：",
+  "error_please_upload_pdf": "请上传PDF文件",
+  "warning_parse_failed_switching_chat": "解析失败，切换到对话模式进行直接识别...",
+  "page_separator": " / "
 }

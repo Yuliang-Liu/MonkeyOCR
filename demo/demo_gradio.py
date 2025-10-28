@@ -239,30 +239,28 @@ if __name__ == '__main__':
             gr.update(value=zip_path, visible=True),
         )
 
-    def chat_with_image(message, pdf_file):
+    def chat_with_image(message, pdf_file, texts):
         """Chat with the uploaded image"""
         if pdf_file is None:
-            return "Please upload an image or PDF file before chatting."
-        
+            return texts['error_no_file_uploaded']
+
         base_dir = os.path.dirname(pdf_file)
         file_ext = pdf_file.split(".")[-1].lower()
         if file_ext not in ['jpg', 'jpeg', 'png', 'pdf']:
-            return "Please upload an image or PDF file before chatting."
-        
+            return texts['error_no_file_uploaded']
+
         try:
             if file_ext in ['jpg', 'jpeg', 'png']:
-                # Chat directly using image file path
                 image_path = pdf_file
                 response = MonkeyOCR_model.chat_model.batch_inference([image_path], [message])[0]
             else:
-                # PDF file processing
-                response = "Only image chat is supported, PDF file chat is not supported."
+                response = texts['error_pdf_chat_not_supported']
             file_writer = FileBasedDataWriter(base_dir)
             md_name = f"chat_response_{uuid.uuid4().hex}.md"
             file_writer.write(md_name, response.encode('utf-8'))
             return response, response, gr.update(value=None, visible=True), gr.update(value=os.path.join(base_dir, md_name), visible=True)
         except Exception as e:
-            response = f"Chat processing error: {str(e)}"
+            response = f"{texts['error_chat_processing']}{str(e)}"
             return response, response, gr.update(value=None, visible=True), gr.update(value=None, visible=True)
 
     # Global cache: store images of each page
@@ -272,22 +270,20 @@ if __name__ == '__main__':
         "total_pages": 0,
     }
 
-    def load_file(file):
-        # Read PDF and convert to images (one page one image)
+    def load_file(file, texts):
         if file.endswith('.pdf'):
             pages = pdf_to_images(file)
         else:
-            # For image files, read directly as single-page image
             image = Image.open(file)
             pages = [image]
         pdf_cache["images"] = pages
         pdf_cache["current_page"] = 0
         pdf_cache["total_pages"] = len(pages)
-        return pages[0], f"<div id='page_info_box'>1 / {len(pages)}</div>"
+        return pages[0], f"<div id='page_info_box'>1{texts['page_separator']}{len(pages)}</div>"
 
-    def turn_page(direction):
+    def turn_page(direction, texts):
         if not pdf_cache["images"]:
-            return None, "<div id='page_info_box'>0 / 0</div>"
+            return None, f"<div id='page_info_box'>0{texts['page_separator']}0</div>"
 
         if direction == "prev":
             pdf_cache["current_page"] = max(0, pdf_cache["current_page"] - 1)
@@ -295,7 +291,7 @@ if __name__ == '__main__':
             pdf_cache["current_page"] = min(pdf_cache["total_pages"] - 1, pdf_cache["current_page"] + 1)
 
         index = pdf_cache["current_page"]
-        return pdf_cache["images"][index], f"<div id='page_info_box'>{index + 1} / {pdf_cache['total_pages']}</div>"
+        return pdf_cache["images"][index], f"<div id='page_info_box'>{index + 1}{texts['page_separator']}{pdf_cache['total_pages']}</div>"
 
     # Global variables to store parsed result file paths
     layout_pdf_path = None
@@ -311,27 +307,27 @@ if __name__ == '__main__':
             return markdown_zip_path
         return None
 
-    def parse_and_update_view(pdf_file):
+    def parse_and_update_view(pdf_file, texts):
         """Parse PDF and update view"""
-        
+
         if pdf_file is None:
             return (
                 gr.update(),
-                "Please upload a PDF file",
-                "Please upload a PDF file",
-                "<div id='page_info_box'>0 / 0</div>",
+                texts['error_please_upload_pdf'],
+                texts['error_please_upload_pdf'],
+                f"<div id='page_info_box'>0{texts['page_separator']}0</div>",
                 gr.update(value=None, visible=True),
                 gr.update(value=None, visible=True),
             )
-        
+
         try:
             # Call the original parsing function
             md_content_ori, md_content, layout_pdf_update, zip_update = parse_pdf_and_return_results(pdf_file)
-            
+
             # Update global variables
             layout_pdf_path = layout_pdf_update['value']
             markdown_zip_path = zip_update['value']
-            
+
             # Load parsed layout PDF for preview
             if layout_pdf_path and os.path.exists(layout_pdf_path):
                 pages = pdf_to_images(layout_pdf_path)
@@ -339,11 +335,11 @@ if __name__ == '__main__':
                 pdf_cache["current_page"] = 0
                 pdf_cache["total_pages"] = len(pages)
                 preview_image = pages[0]
-                page_info = f"<div id='page_info_box'>1 / {len(pages)}</div>"
+                page_info = f"<div id='page_info_box'>1{texts['page_separator']}{len(pages)}</div>"
             else:
                 preview_image = None
-                page_info = "<div id='page_info_box'>0 / 0</div>"
-            
+                page_info = f"<div id='page_info_box'>0{texts['page_separator']}0</div>"
+
             return (
                 preview_image,
                 md_content,
@@ -353,37 +349,31 @@ if __name__ == '__main__':
                 zip_update,
             )
         except:
-            logger.warning("Parsing failed, switching to chat mode for direct recognition...")
-            # If parsing fails, directly use chat mode for recognition
-            md_content_ori, md_content, layout_pdf_update, zip_update = chat_with_image(instruction, pdf_file)
+            logger.warning(texts['warning_parse_failed_switching_chat'])
+            md_content_ori, md_content, layout_pdf_update, zip_update = chat_with_image(texts['prompt_text_content'], pdf_file, texts)
             return (
                 gr.update(),
                 md_content,
                 md_content_ori,
-                "<div id='page_info_box'>1 / 1</div>",
+                f"<div id='page_info_box'>1{texts['page_separator']}1</div>",
                 layout_pdf_update,
                 zip_update,
             )
 
-    def clear_all():
+    def clear_all(texts):
         """Clear all inputs and outputs"""
         pdf_cache["images"] = []
         pdf_cache["current_page"] = 0
         pdf_cache["total_pages"] = 0
         return (
-            None,  # Clear file input
-            None,  # Clear PDF preview
-            "## 🕐 Waiting for parsing result...",  # Clear Markdown preview
-            "🕐 Waiting for parsing result...",  # Clear Markdown raw text
-            "<div id='page_info_box'>0 / 0</div>",  # Clear page info
+            None,
+            None,
+            texts['please_click_parse'],
+            texts['waiting_for_parsing'],
+            f"<div id='page_info_box'>0{texts['page_separator']}0</div>",
             gr.update(value=None, visible=True),
             gr.update(value=None, visible=True),
         )
-
-    instruction = f'''Please output the text content from the image.'''
-    instruction_mf = f'''Please write out the expression of the formula in the image using LaTeX format.'''
-    instruction_table_html = f'''This is the image of a table. Please output the table in html format.'''
-    instruction_table_latex = f'''Please output the table in the image in LaTeX format.'''
 
     def switch_language(lang):
         texts = load_i18n(lang)
@@ -474,7 +464,7 @@ if __name__ == '__main__':
                         pdf_view = gr.Image(label=texts['pdf_preview'], visible=True, height=800, show_label=False)
                         with gr.Row():
                             prev_btn = gr.Button(texts['prev_page'])
-                            page_info = gr.HTML(value="<div id='page_info_box'>0 / 0</div>", elem_id="page_info_html")
+                            page_info = gr.HTML(value=f"<div id='page_info_box'>0{texts['page_separator']}0</div>", elem_id="page_info_html")
                             next_btn = gr.Button(texts['next_page'])
                     with gr.Column(scale=3):
                         result_display_section = gr.Markdown(f"### {texts['result_display']}")
@@ -503,38 +493,44 @@ if __name__ == '__main__':
             ]
         )
 
-        # Event handling
-        # Show PDF preview on file upload
         pdf_input.upload(
             fn=load_file,
-            inputs=pdf_input,
+            inputs=[pdf_input, i18n_texts],
             outputs=[pdf_view, page_info]
         )
-        
-        # Page turning function
-        prev_btn.click(fn=lambda: turn_page("prev"), outputs=[pdf_view, page_info], show_progress=False)
-        next_btn.click(fn=lambda: turn_page("next"), outputs=[pdf_view, page_info], show_progress=False)
+
+        prev_btn.click(
+            fn=lambda texts: turn_page("prev", texts),
+            inputs=i18n_texts,
+            outputs=[pdf_view, page_info],
+            show_progress=False
+        )
+        next_btn.click(
+            fn=lambda texts: turn_page("next", texts),
+            inputs=i18n_texts,
+            outputs=[pdf_view, page_info],
+            show_progress=False
+        )
 
         parse_button.click(
             fn=parse_and_update_view,
-            inputs=pdf_input,
+            inputs=[pdf_input, i18n_texts],
             outputs=[pdf_view, md_view, md_raw, page_info, pdf_download_button, md_download_button],
             show_progress=True,
             show_progress_on=[md_view, md_raw]
         )
-        
-        # Q&A button
+
         chat_button.click(
             fn=chat_with_image,
-            inputs=[chat_input, pdf_input],
+            inputs=[chat_input, pdf_input, i18n_texts],
             outputs=[md_view, md_raw, pdf_download_button, md_download_button],
             show_progress=True,
             show_progress_on=[md_view, md_raw]
         )
-        
-        # Clear button
+
         clear_button.click(
             fn=clear_all,
+            inputs=i18n_texts,
             outputs=[pdf_input, pdf_view, md_view, md_raw, page_info, pdf_download_button, md_download_button],
             show_progress=False
         )
