@@ -392,8 +392,12 @@ if __name__ == '__main__':
             gr.update(value=texts['prev_page']),
             gr.update(value=texts['next_page']),
             gr.update(value=f"### {texts['result_display']}"),
-            gr.update(value=texts['download_pdf_layout']),
-            gr.update(value=texts['download_markdown']),
+            gr.update(label=texts['markdown_render_preview']),
+            gr.update(label=texts['markdown_raw_text']),
+            gr.update(value=texts['please_click_parse']),
+            gr.update(value=texts['waiting_for_parsing']),
+            gr.update(label=texts['download_pdf_layout']),
+            gr.update(label=texts['download_markdown']),
             gr.update(label=texts['language'])
         )
     
@@ -469,12 +473,14 @@ if __name__ == '__main__':
                     with gr.Column(scale=3):
                         result_display_section = gr.Markdown(f"### {texts['result_display']}")
                         with gr.Tabs(elem_id="markdown_tabs"):
-                            with gr.TabItem(texts['markdown_render_preview']):
+                            tab_render = gr.TabItem(texts['markdown_render_preview'])
+                            with tab_render:
                                 md_view = gr.Markdown(value=texts['please_click_parse'], label=texts['markdown_render_preview'], max_height=600, latex_delimiters=[
                                     {"left": "$$", "right": "$$", "display": True},
                                     {"left": "$", "right": "$", "display": False},
                                 ], show_copy_button=False, elem_id="markdown_output")
-                            with gr.TabItem(texts['markdown_raw_text']):
+                            tab_raw = gr.TabItem(texts['markdown_raw_text'])
+                            with tab_raw:
                                 md_raw = gr.Textbox(value=texts['waiting_for_parsing'], label=texts['markdown_raw_text'], max_lines=100, lines=38, show_copy_button=True, elem_id="markdown_output", show_label=False)
                 with gr.Row():
                     with gr.Column(scale=3):
@@ -486,9 +492,10 @@ if __name__ == '__main__':
             fn=switch_language,
             inputs=lang_switch,
             outputs=[
-                i18n_texts, chat_input, title_html, upload_section, pdf_input, 
+                i18n_texts, chat_input, title_html, upload_section, pdf_input,
                 actions_section, parse_button, chat_button, clear_button,
                 file_preview_section, prev_btn, next_btn, result_display_section,
+                tab_render, tab_raw, md_view, md_raw,
                 pdf_download_button, md_download_button, lang_switch
             ]
         )
