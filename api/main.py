@@ -14,6 +14,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
 from tempfile import gettempdir
 import zipfile
@@ -22,6 +23,8 @@ import time
 
 from magic_pdf.model.custom_model import MonkeyOCR
 import uvicorn
+from shared.model_manager import model_manager
+import gradio as gr
 
 # Response models
 class TaskResponse(BaseModel):
@@ -37,39 +40,23 @@ class ParseResponse(BaseModel):
     files: Optional[List[str]] = None
     download_url: Optional[str] = None
 
-# Global model instance and lock
-monkey_ocr_model = None
-supports_async = False
-model_lock = asyncio.Lock()
-max_workers = int(os.getenv("MAX_WORKERS", 4))
-executor = ThreadPoolExecutor(max_workers=max_workers)
+# Global executor
+executor = ThreadPoolExecutor(max_workers=4)
 
 def initialize_model():
     """Initialize MonkeyOCR model"""
-    global monkey_ocr_model
-    global supports_async
-    if monkey_ocr_model is None:
-        config_path = os.getenv("MONKEYOCR_CONFIG", "model_configs.yaml")
-        monkey_ocr_model = MonkeyOCR(config_path)
-        supports_async = is_async_model(monkey_ocr_model)
-    return monkey_ocr_model
+    config_path = os.getenv("MONKEYOCR_CONFIG", "model_configs.yaml")
+    return model_manager.initialize_model(config_path)
 
-def is_async_model(model: MonkeyOCR) -> bool:
-    """Check if the model supports async concurrent calls"""
-    if hasattr(model, 'chat_model'):
-        chat_model = model.chat_model
-        # More specific check for async models
-        is_async = hasattr(chat_model, 'async_batch_inference')
-        logger.info(f"Model {chat_model.__class__.__name__} supports async: {is_async}")
-        return is_async
-    return False
 
 async def smart_model_call(func, *args, **kwargs):
     """
     Smart wrapper that automatically chooses between concurrent and blocking calls
     based on the model's capabilities
     """
-    global monkey_ocr_model, model_lock
+    monkey_ocr_model = model_manager.get_model()
+    model_lock = model_manager.get_model_lock()
+    supports_async = model_manager.get_async_support()
     
     if not monkey_ocr_model:
         raise HTTPException(status_code=500, detail="Model not initialized")
@@ -91,7 +78,8 @@ async def smart_batch_model_call(images_and_questions_list, batch_func):
     """
     Smart batch processing that can handle multiple requests efficiently
     """
-    global monkey_ocr_model
+    monkey_ocr_model = model_manager.get_model()
+    supports_async = model_manager.get_async_support()
     
     if not monkey_ocr_model:
         raise HTTPException(status_code=500, detail="Model not initialized")
@@ -165,7 +153,7 @@ async def lifespan(app: FastAPI):
     # Startup
     try:
         initialize_model()
-        model_type = "async-capable" if supports_async else "sync-only"
+        model_type = "async-capable" if model_manager.get_async_support() else "sync-only"
         logger.info(f"✅ MonkeyOCR model initialized successfully ({model_type})")
     except Exception as e:
         logger.info(f"❌ Failed to initialize MonkeyOCR model: {e}")
@@ -190,15 +178,11 @@ logger.info(f"Using temporary directory: {temp_dir}")
 os.makedirs(temp_dir, exist_ok=True)
 app.mount("/static", StaticFiles(directory=temp_dir), name="static")
 
-@app.get("/")
-async def root():
-    """Root endpoint"""
-    return {"message": "MonkeyOCR API is running", "version": "1.0.0"}
 
 @app.get("/health")
 async def health_check():
     """Health check endpoint"""
-    return {"status": "healthy", "model_loaded": monkey_ocr_model is not None}
+    return {"status": "healthy", "model_loaded": model_manager.is_model_loaded()}
 
 @app.post("/ocr/text", response_model=TaskResponse)
 async def extract_text(file: UploadFile = File(...)):
@@ -232,6 +216,10 @@ async def async_parse_file(input_file_path: str, output_dir: str, split_pages: b
     import asyncio
     from concurrent.futures import ThreadPoolExecutor
     import uuid
+    
+    monkey_ocr_model = model_manager.get_model()
+    supports_async = model_manager.get_async_support()
+    model_lock = model_manager.get_model_lock()
     
     if not monkey_ocr_model:
         raise HTTPException(status_code=500, detail="Model not initialized")
@@ -531,6 +519,7 @@ async def async_single_task_recognition(input_file_path: str, output_dir: str, t
 async def parse_document_internal(file: UploadFile, split_pages: bool = False):
     """Internal function to parse document with optional page splitting"""
     try:
+        monkey_ocr_model = model_manager.get_model()
         if not monkey_ocr_model:
             raise HTTPException(status_code=500, detail="Model not initialized")
         
@@ -664,6 +653,10 @@ async def create_zip_file_async(result_dir, zip_path, original_name, split_pages
 async def perform_ocr_task(file: UploadFile, task_type: str) -> TaskResponse:
     """Perform OCR task on uploaded file"""
     try:
+        monkey_ocr_model = model_manager.get_model()
+        supports_async = model_manager.get_async_support()
+        model_lock = model_manager.get_model_lock()
+        
         if not monkey_ocr_model:
             raise HTTPException(status_code=500, detail="Model not initialized")
         
@@ -726,6 +719,19 @@ async def perform_ocr_task(file: UploadFile, task_type: str) -> TaskResponse:
             content="",
             message=f"OCR task failed: {str(e)}"
         )
+
+@app.get("/")
+async def root():
+    """Redirect root path to dashboard"""
+    return RedirectResponse(url="/dashboard")
+
+# Initialize model for Gradio app and mount at the end
+model_manager.initialize_model()
+
+# Import and mount Gradio app - this must be LAST to avoid route conflicts
+from demo.gradio_demo import create_gradio_app
+gradio_app = create_gradio_app()
+app = gr.mount_gradio_app(app, gradio_app, path="/dashboard")
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=7861)
