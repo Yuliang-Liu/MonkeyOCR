@@ -185,21 +185,17 @@ class MonkeyOCR:
                 logger.info(f"Unloading chat model ({self.chat_backend})")
 
                 if self.chat_backend == 'lmdeploy' or self.chat_backend == 'lmdeploy_queue':
-                    if hasattr(self.chat_model, 'pipe') and self.chat_model.pipe is not None:
-                        try:
-                            if hasattr(self.chat_model.pipe, 'model'):
-                                del self.chat_model.pipe.model
-                            if hasattr(self.chat_model.pipe, 'backend'):
-                                del self.chat_model.pipe.backend
-                            del self.chat_model.pipe
-                        except Exception as e:
-                            logger.warning(f"Error deleting lmdeploy pipe components: {e}")
-
                     if hasattr(self.chat_model, 'shutdown'):
                         try:
                             self.chat_model.shutdown()
                         except Exception as e:
                             logger.warning(f"Error calling shutdown: {e}")
+
+                    if hasattr(self.chat_model, 'pipe') and self.chat_model.pipe is not None:
+                        try:
+                            del self.chat_model.pipe
+                        except Exception as e:
+                            logger.warning(f"Error deleting lmdeploy pipe: {e}")
 
                 elif self.chat_backend in ['vllm', 'vllm_queue', 'vllm_async']:
                     if hasattr(self.chat_model, 'engine') and self.chat_model.engine is not None:
@@ -373,7 +369,7 @@ class MonkeyOCR:
             raise
 
 class MonkeyChat_LMDeploy:
-    def __init__(self, model_path, dp=1, tp=1): 
+    def __init__(self, model_path, dp=1, tp=1):
         try:
             from lmdeploy import pipeline, GenerationConfig, ChatTemplateConfig
         except ImportError:
@@ -396,17 +392,27 @@ class MonkeyChat_LMDeploy:
             device = torch.cuda.current_device()
             capability = torch.cuda.get_device_capability(device)
             sm_version = capability[0] * 10 + capability[1]  # e.g. sm75 = 7.5
-            
+
             # use float16 if computing capability <= sm75 (7.5)
             if sm_version <= 75:
                 dtype = "float16"
         engine_config.dtype = dtype
         return engine_config
-    
+
     def batch_inference(self, images, questions):
         inputs = [(question, load_image(image, max_size=1600)) for image, question in zip(images, questions)]
         outputs = self.pipe(inputs, gen_config=self.gen_config, use_tqdm=True)
         return [output.text for output in outputs]
+
+    def shutdown(self):
+        if hasattr(self, 'pipe') and self.pipe is not None:
+            try:
+                if hasattr(self.pipe, 'close'):
+                    self.pipe.close()
+                    logger.info("LMDeploy pipeline closed")
+                time.sleep(0.3)
+            except Exception as e:
+                logger.warning(f"Error closing lmdeploy pipeline: {e}")
     
 class MonkeyChat_vLLM:
     def __init__(self, model_path, tp=1):

@@ -363,9 +363,20 @@ async def async_parse_file(input_file_path: str, output_dir: str, split_pages: b
         from magic_pdf.model.doc_analyze_by_custom_model_llm import doc_analyze_llm
         return ds.apply(doc_analyze_llm, MonkeyOCR_model=monkey_ocr_model, split_pages=split_pages)
     
+    global last_request_time
+
     logger.info("Starting document parsing...")
     start_time = time.time()
-    
+
+    if vram_idle_timeout > 0:
+        last_request_time = time.time()
+
+    if not monkey_ocr_model.is_loaded():
+        async with model_lock:
+            if not monkey_ocr_model.is_loaded():
+                logger.info("Models were unloaded, reloading before document parsing")
+                await asyncio.get_event_loop().run_in_executor(None, monkey_ocr_model.reload_models)
+
     # Use smart model call for inference
     if supports_async:
         # For async models, run without lock
@@ -374,7 +385,10 @@ async def async_parse_file(input_file_path: str, output_dir: str, split_pages: b
         # For sync models, use lock
         async with model_lock:
             infer_result = await asyncio.get_event_loop().run_in_executor(None, run_inference_sync)
-    
+
+    if vram_idle_timeout > 0:
+        last_request_time = time.time()
+
     parsing_time = time.time() - start_time
     logger.info(f"Parsing time: {parsing_time:.2f}s")
     
@@ -543,13 +557,24 @@ async def async_single_task_recognition(input_file_path: str, output_dir: str, t
     
     images, file_extension = await asyncio.get_event_loop().run_in_executor(None, load_images_sync)
     
+    global last_request_time
+
     # Perform recognition
     logger.info(f"Performing {task} recognition on {len(images)} image(s)...")
     start_time = time.time()
-    
+
+    if vram_idle_timeout > 0:
+        last_request_time = time.time()
+
+    if not monkey_ocr_model.is_loaded():
+        async with model_lock:
+            if not monkey_ocr_model.is_loaded():
+                logger.info("Models were unloaded, reloading before task recognition")
+                await asyncio.get_event_loop().run_in_executor(None, monkey_ocr_model.reload_models)
+
     # Prepare instructions for all images
     instructions = [instruction] * len(images)
-    
+
     # Use chat model for recognition
     if supports_async and hasattr(monkey_ocr_model.chat_model, 'async_batch_inference'):
         # Use async batch inference if available
@@ -565,7 +590,10 @@ async def async_single_task_recognition(input_file_path: str, output_dir: str, t
         responses = await asyncio.get_event_loop().run_in_executor(
             None, monkey_ocr_model.chat_model.batch_inference, images, instructions
         )
-    
+
+    if vram_idle_timeout > 0:
+        last_request_time = time.time()
+
     recognition_time = time.time() - start_time
     logger.info(f"Recognition time: {recognition_time:.2f}s")
     
