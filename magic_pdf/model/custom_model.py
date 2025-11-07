@@ -1,6 +1,7 @@
 import os
 import time
 import torch
+import gc
 from magic_pdf.config.constants import *
 from magic_pdf.model.sub_modules.model_init import AtomModelSingleton
 from magic_pdf.model.model_list import AtomicModel
@@ -161,6 +162,215 @@ class MonkeyOCR:
             logger.warning('using backend: LMDeploy (default)')
             self.chat_model = MonkeyChat_LMDeploy(chat_path)
         logger.info(f'LMM loaded: {self.chat_model.model_name}')
+
+        self.models_loaded = True
+        self.config_path = config_path
+        self.models_dir = models_dir
+        self.bf16_supported = bf16_supported
+        self.chat_path = chat_path
+        self.chat_backend = chat_backend
+
+    def is_loaded(self):
+        return self.models_loaded
+
+    def unload_models(self):
+        if not self.models_loaded:
+            logger.info("Models already unloaded")
+            return
+
+        logger.info("Starting VRAM release - unloading all models")
+
+        try:
+            if hasattr(self, 'chat_model') and self.chat_model is not None:
+                logger.info(f"Unloading chat model ({self.chat_backend})")
+
+                if self.chat_backend == 'lmdeploy' or self.chat_backend == 'lmdeploy_queue':
+                    if hasattr(self.chat_model, 'pipe') and self.chat_model.pipe is not None:
+                        try:
+                            if hasattr(self.chat_model.pipe, 'model'):
+                                del self.chat_model.pipe.model
+                            if hasattr(self.chat_model.pipe, 'backend'):
+                                del self.chat_model.pipe.backend
+                            del self.chat_model.pipe
+                        except Exception as e:
+                            logger.warning(f"Error deleting lmdeploy pipe components: {e}")
+
+                    if hasattr(self.chat_model, 'shutdown'):
+                        try:
+                            self.chat_model.shutdown()
+                        except Exception as e:
+                            logger.warning(f"Error calling shutdown: {e}")
+
+                elif self.chat_backend in ['vllm', 'vllm_queue', 'vllm_async']:
+                    if hasattr(self.chat_model, 'engine') and self.chat_model.engine is not None:
+                        try:
+                            del self.chat_model.engine
+                        except Exception as e:
+                            logger.warning(f"Error deleting vllm engine: {e}")
+
+                    if hasattr(self.chat_model, 'pipe') and self.chat_model.pipe is not None:
+                        try:
+                            if hasattr(self.chat_model.pipe, 'llm_engine'):
+                                del self.chat_model.pipe.llm_engine
+                            del self.chat_model.pipe
+                        except Exception as e:
+                            logger.warning(f"Error deleting vllm pipe: {e}")
+
+                    if hasattr(self.chat_model, 'shutdown'):
+                        try:
+                            self.chat_model.shutdown()
+                        except Exception as e:
+                            logger.warning(f"Error calling shutdown: {e}")
+
+                elif self.chat_backend == 'transformers':
+                    if hasattr(self.chat_model, 'model') and self.chat_model.model is not None:
+                        try:
+                            self.chat_model.model.to('cpu')
+                            del self.chat_model.model
+                        except Exception as e:
+                            logger.warning(f"Error unloading transformers model: {e}")
+
+                    if hasattr(self.chat_model, 'processor'):
+                        try:
+                            del self.chat_model.processor
+                        except Exception as e:
+                            logger.warning(f"Error deleting processor: {e}")
+
+                del self.chat_model
+                self.chat_model = None
+                gc.collect()
+
+            if hasattr(self, 'layoutreader_model') and self.layoutreader_model is not None:
+                logger.info("Unloading layoutreader model")
+                if self.device != 'cpu':
+                    self.layoutreader_model.to('cpu')
+                del self.layoutreader_model
+                self.layoutreader_model = None
+                gc.collect()
+
+            if hasattr(self, 'layout_model') and self.layout_model is not None:
+                logger.info("Unloading layout model")
+                del self.layout_model
+                self.layout_model = None
+                gc.collect()
+
+            atom_model_manager = AtomModelSingleton()
+            if hasattr(atom_model_manager, '_models'):
+                logger.info("Clearing AtomModelSingleton cache")
+                for model_name in list(atom_model_manager._models.keys()):
+                    try:
+                        del atom_model_manager._models[model_name]
+                    except Exception as e:
+                        logger.warning(f"Error deleting model {model_name}: {e}")
+                atom_model_manager._models.clear()
+
+            for _ in range(3):
+                gc.collect()
+
+            if self.device == 'cuda':
+                if torch.cuda.is_available():
+                    torch.cuda.synchronize()
+                    torch.cuda.empty_cache()
+                    torch.cuda.ipc_collect()
+                    logger.info(f"CUDA cache cleared")
+            elif str(self.device).startswith("npu"):
+                import torch_npu
+                if torch_npu.npu.is_available():
+                    torch_npu.npu.empty_cache()
+            elif str(self.device).startswith("mps"):
+                torch.mps.empty_cache()
+
+            for _ in range(3):
+                gc.collect()
+
+            self.models_loaded = False
+            logger.info("VRAM released - all models unloaded successfully")
+
+            if torch.cuda.is_available():
+                allocated = torch.cuda.memory_allocated() / (1024**3)
+                reserved = torch.cuda.memory_reserved() / (1024**3)
+                logger.info(f"GPU Memory - Allocated: {allocated:.2f}GB, Reserved: {reserved:.2f}GB")
+
+        except Exception as e:
+            logger.error(f"Error during model unloading: {e}")
+            raise
+
+    def reload_models(self):
+        if self.models_loaded:
+            logger.info("Models already loaded")
+            return
+
+        logger.info("Reloading models into VRAM")
+
+        try:
+            atom_model_manager = AtomModelSingleton()
+            if self.layout_model_name == MODEL_NAME.DocLayout_YOLO:
+                layout_model_path = os.path.join(self.models_dir, self.configs['weights'][self.layout_model_name])
+                self.layout_model = atom_model_manager.get_atom_model(
+                    atom_model_name=AtomicModel.Layout,
+                    layout_model_name=MODEL_NAME.DocLayout_YOLO,
+                    doclayout_yolo_weights=layout_model_path,
+                    device=self.device,
+                )
+            elif self.layout_model_name == MODEL_NAME.PaddleXLayoutModel:
+                layout_model_path = None
+                if self.layout_model_name in self.configs['weights']:
+                    layout_model_path = os.path.join(self.models_dir, self.configs['weights'][self.layout_model_name])
+                self.layout_model = atom_model_manager.get_atom_model(
+                    atom_model_name=AtomicModel.Layout,
+                    layout_model_name=MODEL_NAME.PaddleXLayoutModel,
+                    paddlexlayout_model_dir=layout_model_path,
+                    device=self.device,
+                )
+            logger.info(f'Layout model reloaded: {self.layout_model_name}')
+
+            if self.layout_reader_name == 'layoutreader':
+                layoutreader_model_dir = os.path.join(self.models_dir, self.configs['weights'][self.layout_reader_name])
+                model = LayoutLMv3ForTokenClassification.from_pretrained(layoutreader_model_dir)
+                if self.bf16_supported:
+                    model.to(self.device).eval().bfloat16()
+                else:
+                    model.to(self.device).eval()
+                self.layoutreader_model = model
+            logger.info(f'LayoutReader model reloaded: {self.layout_reader_name}')
+
+            if self.chat_backend == 'lmdeploy':
+                dp = self.chat_config.get('data_parallelism', 1)
+                tp = self.chat_config.get('model_parallelism', 1)
+                self.chat_model = MonkeyChat_LMDeploy(self.chat_path, dp=dp, tp=tp)
+            elif self.chat_backend == 'lmdeploy_queue':
+                dp = self.chat_config.get('data_parallelism', 1)
+                tp = self.chat_config.get('model_parallelism', 1)
+                queue_config = self.chat_config.get('queue_config', {})
+                self.chat_model = MonkeyChat_LMDeploy_queue(self.chat_path, dp=dp, tp=tp, **queue_config)
+            elif self.chat_backend == 'vllm':
+                tp = self.chat_config.get('model_parallelism', 1)
+                self.chat_model = MonkeyChat_vLLM(self.chat_path, tp=tp)
+            elif self.chat_backend == 'vllm_queue':
+                tp = self.chat_config.get('model_parallelism', 1)
+                queue_config = self.chat_config.get('queue_config', {})
+                self.chat_model = MonkeyChat_vLLM_queue(self.chat_path, tp=tp, **queue_config)
+            elif self.chat_backend == 'vllm_async':
+                tp = self.chat_config.get('model_parallelism', 1)
+                self.chat_model = MonkeyChat_vLLM_async(self.chat_path, tp=tp)
+            elif self.chat_backend == 'transformers':
+                batch_size = self.chat_config.get('batch_size', 5)
+                self.chat_model = MonkeyChat_transformers(self.chat_path, batch_size, device=self.device)
+            elif self.chat_backend == 'api':
+                api_config = self.configs.get('api_config', {})
+                self.chat_model = MonkeyChat_OpenAIAPI(
+                    url=api_config.get('url'),
+                    model_name=api_config.get('model_name'),
+                    api_key=api_config.get('api_key', None)
+                )
+            logger.info(f'Chat model reloaded: {self.chat_model.model_name}')
+
+            self.models_loaded = True
+            logger.info("All models reloaded successfully")
+
+        except Exception as e:
+            logger.error(f"Error during model reloading: {e}")
+            raise
 
 class MonkeyChat_LMDeploy:
     def __init__(self, model_path, dp=1, tp=1): 

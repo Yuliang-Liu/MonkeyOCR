@@ -44,14 +44,26 @@ model_lock = asyncio.Lock()
 max_workers = int(os.getenv("MAX_WORKERS", 4))
 executor = ThreadPoolExecutor(max_workers=max_workers)
 
+last_request_time = None
+vram_idle_timeout = 0
+vram_monitor_task = None
+
 def initialize_model():
     """Initialize MonkeyOCR model"""
     global monkey_ocr_model
     global supports_async
+    global vram_idle_timeout
+    global last_request_time
     if monkey_ocr_model is None:
         config_path = os.getenv("MONKEYOCR_CONFIG", "model_configs.yaml")
         monkey_ocr_model = MonkeyOCR(config_path)
         supports_async = is_async_model(monkey_ocr_model)
+
+        vram_idle_timeout = monkey_ocr_model.configs.get('vram_idle_timeout', 0)
+        logger.info(f"VRAM idle timeout: {vram_idle_timeout}s (0 = disabled)")
+
+        if vram_idle_timeout > 0:
+            last_request_time = time.time()
     return monkey_ocr_model
 
 def is_async_model(model: MonkeyOCR) -> bool:
@@ -69,19 +81,25 @@ async def smart_model_call(func, *args, **kwargs):
     Smart wrapper that automatically chooses between concurrent and blocking calls
     based on the model's capabilities
     """
-    global monkey_ocr_model, model_lock
-    
+    global monkey_ocr_model, model_lock, last_request_time, vram_idle_timeout
+
     if not monkey_ocr_model:
         raise HTTPException(status_code=500, detail="Model not initialized")
-    
+
+    if vram_idle_timeout > 0:
+        last_request_time = time.time()
+
+    if not monkey_ocr_model.is_loaded():
+        async with model_lock:
+            if not monkey_ocr_model.is_loaded():
+                logger.info("Models were unloaded, reloading before processing request")
+                await asyncio.get_event_loop().run_in_executor(None, monkey_ocr_model.reload_models)
+
     if supports_async:
-        # For async models, no need for model_lock, can run concurrently
         logger.info("Using concurrent execution (async model detected)")
-        # Use asyncio's thread pool to avoid blocking the event loop
         loop = asyncio.get_event_loop()
         return await loop.run_in_executor(None, func, *args, **kwargs)
     else:
-        # For sync models, use model_lock to prevent conflicts
         logger.info("Using blocking execution with lock (sync model detected)")
         async with model_lock:
             loop = asyncio.get_event_loop()
@@ -91,11 +109,20 @@ async def smart_batch_model_call(images_and_questions_list, batch_func):
     """
     Smart batch processing that can handle multiple requests efficiently
     """
-    global monkey_ocr_model
-    
+    global monkey_ocr_model, last_request_time, vram_idle_timeout, model_lock
+
     if not monkey_ocr_model:
         raise HTTPException(status_code=500, detail="Model not initialized")
-    
+
+    if vram_idle_timeout > 0:
+        last_request_time = time.time()
+
+    if not monkey_ocr_model.is_loaded():
+        async with model_lock:
+            if not monkey_ocr_model.is_loaded():
+                logger.info("Models were unloaded, reloading before processing request")
+                await asyncio.get_event_loop().run_in_executor(None, monkey_ocr_model.reload_models)
+
     if supports_async and hasattr(monkey_ocr_model.chat_model, 'async_batch_inference'):
         # Use native async batch processing for maximum efficiency
         logger.info(f"Using native async batch processing for {len(images_and_questions_list)} requests")
@@ -159,22 +186,72 @@ async def smart_batch_model_call(images_and_questions_list, batch_func):
             results.append(result)
         return results
 
+async def vram_release_monitor():
+    """Background task to monitor VRAM usage and release when idle"""
+    global monkey_ocr_model, last_request_time, vram_idle_timeout, model_lock
+
+    logger.info("VRAM release monitor started")
+
+    check_interval = 30
+
+    while True:
+        try:
+            await asyncio.sleep(check_interval)
+
+            if vram_idle_timeout <= 0:
+                continue
+
+            if last_request_time is None:
+                continue
+
+            if not monkey_ocr_model or not monkey_ocr_model.is_loaded():
+                continue
+
+            idle_time = time.time() - last_request_time
+
+            if idle_time >= vram_idle_timeout:
+                logger.info(f"Idle for {idle_time:.1f}s (threshold: {vram_idle_timeout}s), releasing VRAM")
+                async with model_lock:
+                    if monkey_ocr_model.is_loaded():
+                        await asyncio.get_event_loop().run_in_executor(None, monkey_ocr_model.unload_models)
+
+        except asyncio.CancelledError:
+            logger.info("VRAM release monitor cancelled")
+            break
+        except Exception as e:
+            logger.error(f"Error in VRAM release monitor: {e}")
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Lifespan event handler"""
-    # Startup
+    global vram_monitor_task
+
     try:
         initialize_model()
         model_type = "async-capable" if supports_async else "sync-only"
         logger.info(f"✅ MonkeyOCR model initialized successfully ({model_type})")
+
+        if vram_idle_timeout > 0:
+            vram_monitor_task = asyncio.create_task(vram_release_monitor())
+            logger.info(f"✅ VRAM auto-release enabled (timeout: {vram_idle_timeout}s)")
+        else:
+            logger.info("VRAM auto-release disabled (timeout=0)")
+
     except Exception as e:
         logger.info(f"❌ Failed to initialize MonkeyOCR model: {e}")
         raise
-    
+
     yield
-    
-    # Shutdown
+
     global executor
+
+    if vram_monitor_task:
+        vram_monitor_task.cancel()
+        try:
+            await vram_monitor_task
+        except asyncio.CancelledError:
+            pass
+
     executor.shutdown(wait=True)
     logger.info("🔄 Application shutdown complete")
 

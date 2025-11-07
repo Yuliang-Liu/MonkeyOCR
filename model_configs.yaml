@@ -1,4 +1,5 @@
 device: cuda # cuda / cpu / mps (using `transformers` as backend)
+vram_idle_timeout: 300 # seconds to wait before releasing VRAM when idle (0 = disabled)
 weights:
   doclayout_yolo: Structure/doclayout_yolo_docstructbench_imgsz1280_2501.pt # or Structure/layout_zh.pt
   PP-DocLayout_plus-L: Structure/PP-DocLayout_plus-L
