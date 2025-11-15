@@ -49,7 +49,7 @@ MonkeyOCR adopts a Structure-Recognition-Relation (SRR) triplet paradigm, which 
 See detailed results below.
 
 ### Comparing MonkeyOCR with closed-source and extra large open-source VLMs.
-<a href="https://zimgs.com/i/EKhkhY"><img src="https://v1.ax1x.com/2025/07/15/EKhkhY.png" alt="EKhkhY.png" border="0" /></a>
+<img src="./asserts/MonkeyOCR_vs_VLMs.png" border="0">
 
 ## Inference Speed (Pages/s) on Different GPUs and [PDF](https://drive.google.com/drive/folders/1geumlJmVY7UUKdr8324sYZ0FHSAElh7m?usp=sharing) Page Counts
 
@@ -1205,17 +1205,17 @@ Get a Quick Hands-On Experience with Our Demo:  http://vlrlabmonkey.xyz:7685 (Th
 </p>
 
 ### Example for formula document
-<img src="https://v1.ax1x.com/2025/06/10/7jVLgB.jpg" alt="7jVLgB.jpg" border="0" />
+<img src="./asserts/Example_for_formula_document.jpg" border="0">
 
 ### Example for table document
-<img src="https://v1.ax1x.com/2025/06/11/7jcOaa.png" alt="7jcOaa.png" border="0" />
+<img src="./asserts/Example_for_table_document.png" border="0">
 
 ### Example for newspaper
-<img src="https://v1.ax1x.com/2025/06/11/7jcP5V.png" alt="7jcP5V.png" border="0" />
+<img src="./asserts/Example_for_newspaper.png" border="0">
 
 ### Example for financial report
-<img src="https://v1.ax1x.com/2025/06/11/7jc10I.png" alt="7jc10I.png" border="0" />
-<img src="https://v1.ax1x.com/2025/06/11/7jcRCL.png" alt="7jcRCL.png" border="0" />
+<img src="./asserts/Example_for_financial_report_01.png" border="0">
+<img src="./asserts/Example_for_financial_report_02.png" border="0">
 
 ## Citing MonkeyOCR
 
