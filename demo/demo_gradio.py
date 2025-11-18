@@ -28,10 +28,10 @@ def load_i18n(lang='en'):
 
 def get_instructions(texts):
     return [
-        texts['prompt_text_content'],
-        texts['prompt_formula'],
-        texts['prompt_table_html'],
-        texts['prompt_table_latex']
+        (texts['prompt_text_content_label'], texts['prompt_text_content']),
+        (texts['prompt_formula_label'], texts['prompt_formula']),
+        (texts['prompt_table_html_label'], texts['prompt_table_html']),
+        (texts['prompt_table_latex_label'], texts['prompt_table_latex'])
     ]
 
 if __name__ == '__main__':
