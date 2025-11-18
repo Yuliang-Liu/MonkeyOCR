@@ -221,20 +221,18 @@ async def extract_table(file: UploadFile = File(...)):
 @app.post("/parse", response_model=ParseResponse)
 async def parse_document(
     file: UploadFile = File(...),
-    return_format: str = Query("zip", description="Return format: zip, markdown, json, pdf_model, pdf_layout, pdf_spans"),
-    return_content: str = Query("all", description="Content to return: all, markdown, content_list, middle_json, model_pdf, layout_pdf, spans_pdf")
+    return_type: str = Query("zip_all", description="Return type: zip_all, zip_markdown, content_list_json, middle_json, model_pdf, layout_pdf, spans_pdf")
 ):
     """Parse complete document (PDF or image)"""
-    return await parse_document_internal(file, split_pages=False, return_format=return_format, return_content=return_content)
+    return await parse_document_internal(file, split_pages=False, return_type=return_type)
 
 @app.post("/parse/split", response_model=ParseResponse)
 async def parse_document_split(
     file: UploadFile = File(...),
-    return_format: str = Query("zip", description="Return format: zip, markdown, json, pdf_model, pdf_layout, pdf_spans"),
-    return_content: str = Query("all", description="Content to return: all, markdown, content_list, middle_json, model_pdf, layout_pdf, spans_pdf")
+    return_type: str = Query("zip_all", description="Return type: zip_all, zip_markdown, content_list_json, middle_json, model_pdf, layout_pdf, spans_pdf")
 ):
     """Parse complete document and split result by pages (PDF or image)"""
-    return await parse_document_internal(file, split_pages=True, return_format=return_format, return_content=return_content)
+    return await parse_document_internal(file, split_pages=True, return_type=return_type)
 
 async def async_parse_file(input_file_path: str, output_dir: str, split_pages: bool = False):
     """
@@ -539,7 +537,7 @@ async def async_single_task_recognition(input_file_path: str, output_dir: str, t
     
     return local_md_dir
 
-async def parse_document_internal(file: UploadFile, split_pages: bool = False, return_format: str = "zip", return_content: str = "all"):
+async def parse_document_internal(file: UploadFile, split_pages: bool = False, return_type: str = "zip_all"):
     """Internal function to parse document with optional page splitting"""
     try:
         if not monkey_ocr_model:
@@ -586,16 +584,15 @@ async def parse_document_internal(file: UploadFile, split_pages: bool = False, r
             file_type = "PDF" if file_ext_with_dot == '.pdf' else "image"
             parse_type = "with page splitting" if split_pages else "standard"
 
-            # Handle different return formats
-            if return_format == "zip":
-                # Create download URL with original filename and timestamp
+            # Handle different return types
+            if return_type in ["zip_all", "zip_markdown"]:
                 suffix = "_split" if split_pages else "_parsed"
-                timestamp = int(time.time() * 1000)  # Use milliseconds for better uniqueness
+                timestamp = int(time.time() * 1000)
                 zip_filename = f"{original_name}{suffix}_{timestamp}_{unique_suffix}.zip"
                 zip_path = os.path.join(temp_dir, zip_filename)
 
-                # Create ZIP file asynchronously
-                await create_zip_file_async(result_dir, zip_path, original_name, split_pages)
+                markdown_only = (return_type == "zip_markdown")
+                await create_zip_file_async(result_dir, zip_path, original_name, split_pages, markdown_only)
 
                 download_url = f"/static/{zip_filename}"
 
@@ -607,12 +604,11 @@ async def parse_document_internal(file: UploadFile, split_pages: bool = False, r
                     download_url=download_url
                 )
             else:
-                # Return specific content directly
-                content, content_type = await get_specific_content(result_dir, return_content, original_name, split_pages)
+                content, content_type = await get_specific_content(result_dir, return_type, original_name, split_pages)
 
                 return ParseResponse(
                     success=True,
-                    message=f"{file_type} parsing ({parse_type}) completed successfully - returning {return_content}",
+                    message=f"{file_type} parsing ({parse_type}) completed successfully - returning {return_type}",
                     output_dir=result_dir,
                     files=files,
                     content=content,
@@ -630,21 +626,10 @@ async def parse_document_internal(file: UploadFile, split_pages: bool = False, r
         logger.error(f"Parsing failed: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Parsing failed: {str(e)}")
 
-async def get_specific_content(result_dir, return_content, original_name, split_pages):
-    """Get specific content from result directory"""
+async def get_specific_content(result_dir, return_type, original_name, split_pages):
+    """Get specific content from result directory based on return_type"""
     def read_content_sync():
-        if return_content == "markdown":
-            # Look for markdown files
-            for root, dirs, filenames in os.walk(result_dir):
-                for filename in filenames:
-                    if filename.endswith('.md'):
-                        file_path = os.path.join(root, filename)
-                        with open(file_path, 'r', encoding='utf-8') as f:
-                            return f.read(), "text/markdown"
-            return "No markdown file found", "text/plain"
-
-        elif return_content == "content_list":
-            # Look for content_list.json files
+        if return_type == "content_list_json":
             for root, dirs, filenames in os.walk(result_dir):
                 for filename in filenames:
                     if filename.endswith('_content_list.json'):
@@ -653,8 +638,7 @@ async def get_specific_content(result_dir, return_content, original_name, split_
                             return f.read(), "application/json"
             return "No content_list.json file found", "text/plain"
 
-        elif return_content == "middle_json":
-            # Look for middle.json files
+        elif return_type == "middle_json":
             for root, dirs, filenames in os.walk(result_dir):
                 for filename in filenames:
                     if filename.endswith('_middle.json'):
@@ -663,9 +647,8 @@ async def get_specific_content(result_dir, return_content, original_name, split_
                             return f.read(), "application/json"
             return "No middle.json file found", "text/plain"
 
-        elif return_content in ["model_pdf", "layout_pdf", "spans_pdf"]:
-            # Look for specific PDF files
-            pdf_suffix = f"_{return_content.replace('_pdf', '')}.pdf"
+        elif return_type in ["model_pdf", "layout_pdf", "spans_pdf"]:
+            pdf_suffix = f"_{return_type.replace('_pdf', '')}.pdf"
             for root, dirs, filenames in os.walk(result_dir):
                 for filename in filenames:
                     if filename.endswith(pdf_suffix):
@@ -677,21 +660,12 @@ async def get_specific_content(result_dir, return_content, original_name, split_
                             return base64_data, "application/pdf"
             return f"No {pdf_suffix} file found", "text/plain"
 
-        elif return_content == "all":
-            # Return summary of all files
-            file_summary = []
-            for root, dirs, filenames in os.walk(result_dir):
-                for filename in filenames:
-                    rel_path = os.path.relpath(os.path.join(root, filename), result_dir)
-                    file_summary.append(rel_path)
-            return f"Available files:\n" + "\n".join(file_summary), "text/plain"
-
         else:
-            return f"Unknown return_content: {return_content}", "text/plain"
+            return f"Unknown return_type: {return_type}", "text/plain"
 
     return await asyncio.get_event_loop().run_in_executor(None, read_content_sync)
 
-async def create_zip_file_async(result_dir, zip_path, original_name, split_pages):
+async def create_zip_file_async(result_dir, zip_path, original_name, split_pages, markdown_only=False):
     """Create ZIP file asynchronously"""
     def create_zip_sync():
         with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
@@ -699,6 +673,10 @@ async def create_zip_file_async(result_dir, zip_path, original_name, split_pages
                 for filename in filenames:
                     file_path = os.path.join(root, filename)
                     rel_path = os.path.relpath(file_path, result_dir)
+
+                    if markdown_only:
+                        if not (filename.endswith('.md') or 'images/' in rel_path or '/images/' in rel_path):
+                            continue
                     
                     if split_pages:
                         # For split pages, maintain the page directory structure
