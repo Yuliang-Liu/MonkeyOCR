@@ -38,9 +38,6 @@ if __name__ == '__main__':
     if gr.NO_RELOAD:
         MonkeyOCR_model = MonkeyOCR('model_configs.yaml')
 
-    current_lang = gr.State('en')
-    i18n_texts = gr.State(load_i18n('en'))
-    
     def render_latex_table_to_image(latex_content, temp_dir):
         """
         Render LaTeX table to image and return base64 encoding
@@ -434,7 +431,8 @@ if __name__ == '__main__':
     with gr.Blocks(theme="ocean", css=css, title='MonkeyOCR') as demo:
         texts = load_i18n('en')
         instructions = get_instructions(texts)
-        
+        i18n_texts = gr.State(load_i18n('en'))
+
         title_html = gr.HTML(f"""
             <div style="display: flex; align-items: center; justify-content: center; margin-bottom: 20px;">
                 <h1 style="margin: 0; font-size: 2em;">{texts['title']}</h1>
