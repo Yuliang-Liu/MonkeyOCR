@@ -21,8 +21,23 @@ MonkeyOCR: Document Parsing with a Structure-Recognition-Relation Triplet Paradi
 [![Public Courses](https://img.shields.io/badge/Openbayes-yellow)](https://openbayes.com/console/public/tutorials/91ESrGvEvBq)
 [![Demo](https://img.shields.io/badge/Demo-blue)](http://vlrlabmonkey.xyz:7685/)
 
+> **MonkeyOCR v1.5 Technical Report: Unlocking Robust Document Parsing for Complex Patterns**<br>
+> Jiarui Zhang, Yuliang Liu, Zijun Wu, Guosheng Pang, Zhili Ye, Yupei Zhong, Junteng Ma, Tao Wei, Haiyang Xu, Weikai Chen, Zeen Wang, Qiangjun Ji, Fanxi Zhou, Qi Zhang, Yuanrui Hu, Jiahao Liu, Zhang Li, Ziyang Zhang, Qiang Liu, Xiang Bai <br>
+[![arXiv](https://img.shields.io/badge/Arxiv-b31b1b.svg?logo=arXiv)](https://arxiv.org/pdf/2511.10390) 
+[![Demo](https://img.shields.io/badge/Demo-blue)](https://aiwrite.wps.cn/pdf/parse/web/)
+>
 
-
+	
+## News 
+* ```2025.11.14 ``` 🚀 We release [MonkeyOCR-v1.5](https://arxiv.org/abs/2511.10390) Technical Report, achieving the best document parsing performance to date. [Demo](https://aiwrite.wps.cn/pdf/parse/web/).
+<p align="center">
+<img src="./asserts/MonkeyOCR_v1_5.jpg" width=800 border="0" />
+<p>
+	
+* ```2025.07.10 ``` 🚀 We release [MonkeyOCR-pro-1.2B](https://huggingface.co/echo840/MonkeyOCR-pro-1.2B), — a leaner and faster version model that outperforms our previous 3B version in accuracy, speed, and efficiency.
+* ```2025.06.12 ``` 🚀 The model’s trending on [Hugging Face](https://huggingface.co/models?sort=trending) #2.
+* ```2025.06.05 ``` 🚀 We release [MonkeyOCR](https://huggingface.co/echo840/MonkeyOCR), an English and Chinese documents parsing model.
+ 
 ## Introduction
 MonkeyOCR adopts a Structure-Recognition-Relation (SRR) triplet paradigm, which simplifies the multi-tool pipeline of modular approaches while avoiding the inefficiency of using large multimodal models for full-page document processing.
 
@@ -34,7 +49,9 @@ MonkeyOCR adopts a Structure-Recognition-Relation (SRR) triplet paradigm, which 
 See detailed results below.
 
 ### Comparing MonkeyOCR with closed-source and extra large open-source VLMs.
-<a href="https://zimgs.com/i/EKhkhY"><img src="https://v1.ax1x.com/2025/07/15/EKhkhY.png" alt="EKhkhY.png" border="0" /></a>
+<p align="center">
+<img src="./asserts/MonkeyOCR_vs_VLMs.png" width=800 border="0">
+<p>
 
 ## Inference Speed (Pages/s) on Different GPUs and [PDF](https://drive.google.com/drive/folders/1geumlJmVY7UUKdr8324sYZ0FHSAElh7m?usp=sharing) Page Counts
 
@@ -208,11 +225,6 @@ See detailed results below.
 ## Supported Hardware
 Due to the limited types of GPUs available to us, we may not be able to provide highly accurate hardware specifications. We've tested the model on GPUs such as the 3090, 4090, A6000, H800, A100, and even the 4060 with 8GB of VRAM (suitable for deploying quantized 3B model and 1.2B model). We are very grateful for the feedback and contributions from the open-source community, who have also successfully run the model on [50-series GPUs](https://github.com/Yuliang-Liu/MonkeyOCR/issues/90), [H200](https://github.com/Yuliang-Liu/MonkeyOCR/issues/151), [L20](https://github.com/Yuliang-Liu/MonkeyOCR/issues/133), [V100](https://github.com/Yuliang-Liu/MonkeyOCR/issues/144), [2080 Ti](https://github.com/Yuliang-Liu/MonkeyOCR/pull/1) and [npu](https://github.com/Yuliang-Liu/MonkeyOCR/pull/226/files).
 
-
-## News 
-* ```2025.07.10 ``` 🚀 We release [MonkeyOCR-pro-1.2B](https://huggingface.co/echo840/MonkeyOCR-pro-1.2B), — a leaner and faster version model that outperforms our previous 3B version in accuracy, speed, and efficiency.
-* ```2025.06.12 ``` 🚀 The model’s trending on [Hugging Face](https://huggingface.co/models?sort=trending). Thanks for the love!
-* ```2025.06.05 ``` 🚀 We release [MonkeyOCR](https://huggingface.co/echo840/MonkeyOCR), an English and Chinese documents parsing model.
 
 
 # Quick Start
@@ -1195,17 +1207,17 @@ Get a Quick Hands-On Experience with Our Demo:  http://vlrlabmonkey.xyz:7685 (Th
 </p>
 
 ### Example for formula document
-<img src="https://v1.ax1x.com/2025/06/10/7jVLgB.jpg" alt="7jVLgB.jpg" border="0" />
+<img src="./asserts/Example_for_formula_document.jpg" border="0">
 
 ### Example for table document
-<img src="https://v1.ax1x.com/2025/06/11/7jcOaa.png" alt="7jcOaa.png" border="0" />
+<img src="./asserts/Example_for_table_document.png" border="0">
 
 ### Example for newspaper
-<img src="https://v1.ax1x.com/2025/06/11/7jcP5V.png" alt="7jcP5V.png" border="0" />
+<img src="./asserts/Example_for_newspaper.png" border="0">
 
 ### Example for financial report
-<img src="https://v1.ax1x.com/2025/06/11/7jc10I.png" alt="7jc10I.png" border="0" />
-<img src="https://v1.ax1x.com/2025/06/11/7jcRCL.png" alt="7jcRCL.png" border="0" />
+<img src="./asserts/Example_for_financial_report_01.png" border="0">
+<img src="./asserts/Example_for_financial_report_02.png" border="0">
 
 ## Citing MonkeyOCR
 
@@ -1220,6 +1232,15 @@ If you wish to refer to the baseline results published here, please use the foll
       archivePrefix={arXiv},
       primaryClass={cs.CV},
       url={https://arxiv.org/abs/2506.05218}, 
+}
+@misc{zhang2025monkeyocrv15technicalreport,
+      title={MonkeyOCR v1.5 Technical Report: Unlocking Robust Document Parsing for Complex Patterns}, 
+      author={Jiarui Zhang and Yuliang Liu and Zijun Wu and Guosheng Pang and Zhili Ye and Yupei Zhong and Junteng Ma and Tao Wei and Haiyang Xu and Weikai Chen and Zeen Wang and Qiangjun Ji and Fanxi Zhou and Qi Zhang and Yuanrui Hu and Jiahao Liu and Zhang Li and Ziyang Zhang and Qiang Liu and Xiang Bai},
+      year={2025},
+      eprint={2511.10390},
+      archivePrefix={arXiv},
+      primaryClass={cs.CV},
+      url={https://arxiv.org/abs/2511.10390}, 
 }
 ```
 
