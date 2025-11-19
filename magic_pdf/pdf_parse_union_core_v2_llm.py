@@ -75,20 +75,25 @@ def chars_to_content(span):
         span['chars'] = sorted(span['chars'], key=lambda x: (x['bbox'][0] + x['bbox'][2]) / 2)
 
         # Calculate average char width
-        char_width_sum = sum([char['bbox'][2] - char['bbox'][0] for char in span['chars']])
+        char_width_sum = sum(char['bbox'][2] - char['bbox'][0] for char in span['chars'])
         char_avg_width = char_width_sum / len(span['chars'])
 
-        content = ''
-        for char in span['chars']:
-
+        content_parts = []
+        threshold = char_avg_width * 0.25
+        
+        for i, char in enumerate(span['chars']):
             # If distance between next char's x0 and previous char's x1 exceeds 0.25 char width, insert a space
-            char1 = char
-            char2 = span['chars'][span['chars'].index(char) + 1] if span['chars'].index(char) + 1 < len(span['chars']) else None
-            if char2 and char2['bbox'][0] - char1['bbox'][2] > char_avg_width * 0.25 and char['c'] != ' ' and char2['c'] != ' ':
-                content += f"{char['c']} "
+            if i + 1 < len(span['chars']):
+                char2 = span['chars'][i + 1]
+                if char2['bbox'][0] - char['bbox'][2] > threshold and char['c'] != ' ' and char2['c'] != ' ':
+                    content_parts.append(char['c'])
+                    content_parts.append(' ')
+                else:
+                    content_parts.append(char['c'])
             else:
-                content += char['c']
+                content_parts.append(char['c'])
 
+        content = ''.join(content_parts)
         content = __replace_ligatures(content)
         span['content'] = __replace_0xfffd(content)
 
