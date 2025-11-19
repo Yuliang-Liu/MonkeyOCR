@@ -164,7 +164,7 @@ def calculate_iou(bbox1, bbox2):
     bbox1_area = (bbox1[2] - bbox1[0]) * (bbox1[3] - bbox1[1])
     bbox2_area = (bbox2[2] - bbox2[0]) * (bbox2[3] - bbox2[1])
 
-    if any([bbox1_area == 0, bbox2_area == 0]):
+    if bbox1_area == 0 or bbox2_area == 0:
         return 0
 
     # Compute the intersection over union by taking the intersection area
@@ -186,8 +186,9 @@ def calculate_overlap_area_2_minbox_area_ratio(bbox1, bbox2):
 
     # The area of overlap area
     intersection_area = (x_right - x_left) * (y_bottom - y_top)
-    min_box_area = min([(bbox1[2] - bbox1[0]) * (bbox1[3] - bbox1[1]),
-                        (bbox2[3] - bbox2[1]) * (bbox2[2] - bbox2[0])])
+    bbox1_area = (bbox1[2] - bbox1[0]) * (bbox1[3] - bbox1[1])
+    bbox2_area = (bbox2[2] - bbox2[0]) * (bbox2[3] - bbox2[1])
+    min_box_area = min(bbox1_area, bbox2_area)
     if min_box_area == 0:
         return 0
     else:
