@@ -378,7 +378,7 @@ if __name__ == '__main__':
         return (
             texts,
             gr.update(choices=instructions, value=instructions[0], label=texts['select_prompt']),
-            gr.update(value=f"<div style=\"display: flex; align-items: center; justify-content: center; margin-bottom: 20px;\"><h1 style=\"margin: 0; font-size: 2em;\">{texts['title']}</h1></div><div style=\"text-align: center; margin-bottom: 10px;\"><em>{texts['subtitle']}</em></div>"),
+            gr.update(value=f"<div style=\"display: flex; align-items: center; justify-content: center; margin-bottom: 20px;\"><h1 style=\"margin: 0; font-size: 2em;\">{texts['title']}</h1></div>"),
             gr.update(value=f"### {texts['upload_section']}"),
             gr.update(label=texts['select_file']),
             gr.update(value=f"### {texts['actions_section']}"),
@@ -436,9 +436,6 @@ if __name__ == '__main__':
         title_html = gr.HTML(f"""
             <div style="display: flex; align-items: center; justify-content: center; margin-bottom: 20px;">
                 <h1 style="margin: 0; font-size: 2em;">{texts['title']}</h1>
-            </div>
-            <div style="text-align: center; margin-bottom: 10px;">
-                <em>{texts['subtitle']}</em>
             </div>
         """)
 

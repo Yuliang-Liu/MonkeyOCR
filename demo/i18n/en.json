@@ -1,12 +1,11 @@
 {
   "title": "MonkeyOCR",
-  "subtitle": "Optical Character Recognition Service",
   "upload_section": "Upload PDF/Image",
   "select_file": "Select File",
   "select_prompt": "Select Prompt",
   "actions_section": "Actions",
   "parse_button": "General Parse",
-  "chat_button": "Parse with Prompt",
+  "chat_button": "Chat with Prompt",
   "clear_button": "Clear",
   "file_preview": "File Preview",
   "pdf_preview": "PDF Preview",
