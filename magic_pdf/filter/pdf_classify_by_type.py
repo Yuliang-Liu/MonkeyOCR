@@ -100,15 +100,19 @@ def classify_by_area(total_page: int, page_width, page_height, img_sz_list, text
     #         return True
 
     # Remove images that appear more than 10 times by objid, these are hidden transparent layers with same id
-    # First count occurrences of each id
-    objid_cnt = Counter([objid for page_img_sz in img_sz_list for _, _, _, _, objid in page_img_sz])
+    # First count occurrences of each id - optimized to avoid nested list comprehensions
+    objid_cnt = Counter()
+    for page_img_sz in img_sz_list:
+        for _, _, _, _, objid in page_img_sz:
+            objid_cnt[objid] += 1
+    
     # Then remove those appearing more than 10 times
     if total_page >= scan_max_page:  # New meta_scan only scans first scan_max_page pages, when page count > scan_max_page, treat total_page as scan_max_page
         total_page = scan_max_page
 
     repeat_threshold = 2  # Set bad_image threshold to 2
     # repeat_threshold = min(2, total_page)  # When total_page is 1, repeat_threshold is 1, will cause misjudgment making all img become bad_img
-    bad_image_objid = set([objid for objid, cnt in objid_cnt.items() if cnt >= repeat_threshold])
+    bad_image_objid = {objid for objid, cnt in objid_cnt.items() if cnt >= repeat_threshold}
     # bad_image_page_idx = [i for i, page_img_sz in enumerate(img_sz_list) if any([objid in bad_image_objid for _, _, _, _, objid in page_img_sz])]
     # text_len_at_bad_image_page_idx = [text_len for i, text_len in enumerate(text_len_list) if i in bad_image_page_idx and text_len > 0]
 
@@ -122,8 +126,9 @@ def classify_by_area(total_page: int, page_width, page_height, img_sz_list, text
     # if len(fake_image_ids) > 0 and any([l > TEXT_LEN_THRESHOLD for l in text_len_at_bad_image_page_idx]):  # These transparent images' pages have text greater than threshold
     #     return True
 
+    # Filter out repeatedly appearing images - optimized to avoid rebuilding lists unnecessarily
     img_sz_list = [[img_sz for img_sz in page_img_sz if img_sz[-1] not in bad_image_objid] for page_img_sz in
-                   img_sz_list]  # Filter out repeatedly appearing images
+                   img_sz_list]
 
     # Some scanned versions split one page image into many, need to stitch images first then calculate
     img_sz_list = merge_images(img_sz_list, page_width, page_height)

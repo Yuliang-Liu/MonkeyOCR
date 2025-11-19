@@ -543,6 +543,7 @@ class MonkeyChat_LMDeploy_queue:
         self.request_queue = deque()
         self.result_futures = {}
         self.queue_lock = threading.Lock()
+        self.queue_event = threading.Event()  # Event for efficient waiting
         self.processing = False
         self.shutdown_flag = False
         
@@ -571,23 +572,24 @@ class MonkeyChat_LMDeploy_queue:
     
     def _background_processor(self):
         """Background thread: continuously process request queue"""
-        import time
         
         while not self.shutdown_flag:
             try:
+                # Wait for requests with timeout using event (more efficient than busy-wait)
+                self.queue_event.wait(timeout=self.queue_timeout)
+                self.queue_event.clear()
+                
                 # Collect a batch of requests
                 batch_requests = self._collect_batch_requests()
                 
                 if batch_requests:
                     # Process batch requests
                     self._process_batch_requests(batch_requests)
-                else:
-                    # Sleep briefly when no requests
-                    time.sleep(0.01)
                     
             except Exception as e:
                 logger.error(f"Background processor error: {e}")
-                time.sleep(0.1)
+                # Brief pause on error to avoid tight loop
+                self.queue_event.wait(timeout=0.1)
     
     def _collect_batch_requests(self):
         """Collect a batch of requests, supports dynamic batch size"""
@@ -700,6 +702,8 @@ class MonkeyChat_LMDeploy_queue:
             
             self.request_queue.append((request_id, image, question, future))
             self.result_futures[request_id] = future
+            # Signal the processor thread that new requests are available
+            self.queue_event.set()
         
         try:
             # Wait for result with timeout
@@ -905,6 +909,7 @@ class MonkeyChat_vLLM_queue:
         self.request_queue = deque()
         self.result_futures = {}
         self.queue_lock = threading.Lock()
+        self.queue_event = threading.Event()  # Event for efficient waiting
         self.processing = False
         self.shutdown_flag = False
         
@@ -922,23 +927,24 @@ class MonkeyChat_vLLM_queue:
     
     def _background_processor(self):
         """Background thread: continuously process request queue"""
-        import time
         
         while not self.shutdown_flag:
             try:
+                # Wait for requests with timeout using event (more efficient than busy-wait)
+                self.queue_event.wait(timeout=self.queue_timeout)
+                self.queue_event.clear()
+                
                 # Collect a batch of requests
                 batch_requests = self._collect_batch_requests()
                 
                 if batch_requests:
                     # Process batch requests
                     self._process_batch_requests(batch_requests)
-                else:
-                    # Sleep briefly when no requests
-                    time.sleep(0.01)
                     
             except Exception as e:
                 logger.error(f"Background processor error: {e}")
-                time.sleep(0.1)
+                # Brief pause on error to avoid tight loop
+                self.queue_event.wait(timeout=0.1)
     
     def _collect_batch_requests(self):
         """Collect a batch of requests, supports dynamic batch size"""
@@ -1062,6 +1068,8 @@ class MonkeyChat_vLLM_queue:
             
             self.request_queue.append((request_id, image, question, future))
             self.result_futures[request_id] = future
+            # Signal the processor thread that new requests are available
+            self.queue_event.set()
         
         try:
             # Wait for result without timeout

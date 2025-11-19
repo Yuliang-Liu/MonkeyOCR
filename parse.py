@@ -481,9 +481,6 @@ def single_task_recognition(input_file, output_dir, MonkeyOCR_model, task):
         
         # Clean up resources
         try:
-            # Give some time for async tasks to complete
-            time.sleep(0.5)
-            
             # Close images if they were opened
             for img in images:
                 if hasattr(img, 'close'):
@@ -753,9 +750,6 @@ Usage examples:
                 if hasattr(MonkeyOCR_model, 'chat_model') and hasattr(MonkeyOCR_model.chat_model, 'close'):
                     MonkeyOCR_model.chat_model.close()
                     
-            # Give time for async tasks to complete before exiting
-            time.sleep(1.0)
-            
             if dist.is_initialized():
                 dist.destroy_process_group()
                 
