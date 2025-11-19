@@ -4,7 +4,6 @@ MonkeyOCR FastAPI Application
 """
 
 import os
-import io
 import tempfile
 from typing import Optional, List
 from pathlib import Path
@@ -15,15 +14,15 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import RedirectResponse
+from fastapi.openapi.utils import get_openapi
 from pydantic import BaseModel
 from tempfile import gettempdir
 import zipfile
 from loguru import logger
 import time
 
-from magic_pdf.model.custom_model import MonkeyOCR
+from magic_pdf.model.model_manager import model_manager
 import uvicorn
-from shared.model_manager import model_manager
 import gradio as gr
 
 # Response models
@@ -48,113 +47,12 @@ def initialize_model():
     config_path = os.getenv("MONKEYOCR_CONFIG", "model_configs.yaml")
     return model_manager.initialize_model(config_path)
 
-
-async def smart_model_call(func, *args, **kwargs):
-    """
-    Smart wrapper that automatically chooses between concurrent and blocking calls
-    based on the model's capabilities
-    """
-    monkey_ocr_model = model_manager.get_model()
-    model_lock = model_manager.get_model_lock()
-    supports_async = model_manager.get_async_support()
-    
-    if not monkey_ocr_model:
-        raise HTTPException(status_code=500, detail="Model not initialized")
-    
-    if supports_async:
-        # For async models, no need for model_lock, can run concurrently
-        logger.info("Using concurrent execution (async model detected)")
-        # Use asyncio's thread pool to avoid blocking the event loop
-        loop = asyncio.get_event_loop()
-        return await loop.run_in_executor(None, func, *args, **kwargs)
-    else:
-        # For sync models, use model_lock to prevent conflicts
-        logger.info("Using blocking execution with lock (sync model detected)")
-        async with model_lock:
-            loop = asyncio.get_event_loop()
-            return await loop.run_in_executor(None, func, *args, **kwargs)
-
-async def smart_batch_model_call(images_and_questions_list, batch_func):
-    """
-    Smart batch processing that can handle multiple requests efficiently
-    """
-    monkey_ocr_model = model_manager.get_model()
-    supports_async = model_manager.get_async_support()
-    
-    if not monkey_ocr_model:
-        raise HTTPException(status_code=500, detail="Model not initialized")
-    
-    if supports_async and hasattr(monkey_ocr_model.chat_model, 'async_batch_inference'):
-        # Use native async batch processing for maximum efficiency
-        logger.info(f"Using native async batch processing for {len(images_and_questions_list)} requests")
-        
-        # Flatten all images and questions
-        all_images = []
-        all_questions = []
-        request_indices = []
-        
-        for i, (images, questions) in enumerate(images_and_questions_list):
-            for img, q in zip(images, questions):
-                all_images.append(img)
-                all_questions.append(q)
-                request_indices.append(i)
-        
-        # Single batch call for all requests
-        try:
-            # Use the chat model's async batch inference method properly
-            all_results = await monkey_ocr_model.chat_model.async_batch_inference(all_images, all_questions)
-        except Exception as e:
-            logger.error(f"Async batch inference failed: {e}, falling back to individual processing")
-            # Fallback to individual processing using the corrected method
-            results = []
-            for images, questions in images_and_questions_list:
-                try:
-                    # Use the thread-safe smart_model_call wrapper
-                    result = await smart_model_call(batch_func, images, questions)
-                    results.append(result)
-                except Exception as inner_e:
-                    logger.error(f"Individual processing also failed: {inner_e}")
-                    results.append([f"Error: {str(inner_e)}"] * len(images))
-            return results
-        
-        # Reconstruct results for each original request
-        results = []
-        result_idx = 0
-        for images, questions in images_and_questions_list:
-            request_results = []
-            for _ in range(len(images)):
-                request_results.append(all_results[result_idx])
-                result_idx += 1
-            results.append(request_results)
-        
-        return results
-    
-    elif supports_async:
-        # Concurrent processing for async models
-        logger.info(f"Using concurrent batch processing for {len(images_and_questions_list)} requests")
-        tasks = []
-        for images, questions in images_and_questions_list:
-            task = smart_model_call(batch_func, images, questions)
-            tasks.append(task)
-        
-        return await asyncio.gather(*tasks, return_exceptions=True)
-    else:
-        # Sequential processing for sync models
-        logger.info(f"Using sequential batch processing for {len(images_and_questions_list)} requests")
-        results = []
-        for images, questions in images_and_questions_list:
-            result = await smart_model_call(batch_func, images, questions)
-            results.append(result)
-        return results
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Lifespan event handler"""
     # Startup
     try:
         initialize_model()
-        model_type = "async-capable" if model_manager.get_async_support() else "sync-only"
-        logger.info(f"✅ MonkeyOCR model initialized successfully ({model_type})")
     except Exception as e:
         logger.info(f"❌ Failed to initialize MonkeyOCR model: {e}")
         raise
@@ -178,6 +76,10 @@ logger.info(f"Using temporary directory: {temp_dir}")
 os.makedirs(temp_dir, exist_ok=True)
 app.mount("/static", StaticFiles(directory=temp_dir), name="static")
 
+@app.get("/")
+async def root():
+    """Redirect root path to docs"""
+    return RedirectResponse(url="/docs")
 
 @app.get("/health")
 async def health_check():
@@ -726,18 +628,36 @@ async def perform_ocr_task(file: UploadFile, task_type: str) -> TaskResponse:
             message=f"OCR task failed: {str(e)}"
         )
 
-@app.get("/")
-async def root():
-    """Redirect root path to dashboard"""
-    return RedirectResponse(url="/dashboard")
-
-# Initialize model for Gradio app and mount at the end
-model_manager.initialize_model()
-
 # Import and mount Gradio app - this must be LAST to avoid route conflicts
-from demo.gradio_demo import create_gradio_app
+from demo.demo_gradio import create_gradio_app
 gradio_app = create_gradio_app()
-app = gr.mount_gradio_app(app, gradio_app, path="/dashboard")
+
+# Enable queueing for better concurrency handling with shared resources
+gradio_app.queue()
+
+app = gr.mount_gradio_app(app, gradio_app, path="/demo")
+
+def custom_openapi():
+    if app.openapi_schema:
+        return app.openapi_schema
+    openapi_schema = get_openapi(
+        title=app.title,
+        version=app.version,
+        description=app.description,
+        routes=app.routes,
+    )
+    openapi_schema.setdefault("paths", {})
+    openapi_schema["paths"]["/demo"] = {
+        "get": {
+            "summary": "Gradio Demo",
+            "description": "Gradio drived visualization web demo, accessible at `/dashboard` to interact with MonkeyOCR.",
+            "responses": {"200": {"description": "Gradio web demo"}},
+        }
+    }
+    app.openapi_schema = openapi_schema
+    return app.openapi_schema
+
+app.openapi = custom_openapi
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=7861)
