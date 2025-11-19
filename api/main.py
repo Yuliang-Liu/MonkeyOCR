@@ -291,14 +291,14 @@ async def async_parse_file(input_file_path: str, output_dir: str, split_pages: b
     
     # Process results asynchronously
     await process_inference_results_async(
-        infer_result, output_dir, safe_name, 
-        local_image_dir, local_md_dir, image_dir, split_pages
+        infer_result, output_dir, safe_name,
+        local_image_dir, local_md_dir, image_dir, split_pages, monkey_ocr_model
     )
     
     return local_md_dir
 
-async def process_inference_results_async(infer_result, output_dir, name_without_suff, 
-                                        local_image_dir, local_md_dir, image_dir, split_pages):
+async def process_inference_results_async(infer_result, output_dir, name_without_suff,
+                                        local_image_dir, local_md_dir, image_dir, split_pages, monkey_ocr_model):
     """
     Process inference results asynchronously
     """
@@ -317,7 +317,7 @@ async def process_inference_results_async(infer_result, output_dir, name_without
         tasks = []
         for page_idx, page_infer_result in enumerate(infer_result):
             task = process_single_page_async(
-                page_infer_result, page_idx, output_dir, name_without_suff
+                page_infer_result, page_idx, output_dir, name_without_suff, monkey_ocr_model
             )
             tasks.append(task)
         
@@ -329,10 +329,10 @@ async def process_inference_results_async(infer_result, output_dir, name_without
         # Process single result
         logger.info("Processing as single result...")
         await process_single_result_async(
-            infer_result, name_without_suff, local_image_dir, local_md_dir, image_dir
+            infer_result, name_without_suff, local_image_dir, local_md_dir, image_dir, monkey_ocr_model
         )
 
-async def process_single_page_async(page_infer_result, page_idx, output_dir, name_without_suff):
+async def process_single_page_async(page_infer_result, page_idx, output_dir, name_without_suff, monkey_ocr_model):
     """
     Process a single page result asynchronously
     """
@@ -380,7 +380,7 @@ async def process_single_page_async(page_infer_result, page_idx, output_dir, nam
     # Run page processing in thread pool
     await asyncio.get_event_loop().run_in_executor(None, process_page_sync)
 
-async def process_single_result_async(infer_result, name_without_suff, local_image_dir, local_md_dir, image_dir):
+async def process_single_result_async(infer_result, name_without_suff, local_image_dir, local_md_dir, image_dir, monkey_ocr_model):
     """
     Process single result asynchronously
     """
@@ -409,7 +409,13 @@ async def async_single_task_recognition(input_file_path: str, output_dir: str, t
     Optimized async version of single_task_recognition
     """
     import uuid
-    
+
+    monkey_ocr_model = model_manager.get_model()
+    supports_async = model_manager.get_async_support()
+
+    if not monkey_ocr_model:
+        raise HTTPException(status_code=500, detail="Model not initialized")
+
     logger.info(f"Starting async single task recognition: {task}")
     
     # Get filename with unique identifier to avoid conflicts
