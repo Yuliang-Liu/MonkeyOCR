@@ -10,6 +10,9 @@ from pathlib import Path
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
+import io
+import re
+import base64
 
 from fastapi import FastAPI, UploadFile, File, HTTPException, Request, Query
 from fastapi.staticfiles import StaticFiles
@@ -522,9 +525,90 @@ async def parse_document_internal(file: UploadFile, split_pages: bool = False, r
         logger.error(f"Parsing failed: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Parsing failed: {str(e)}")
 
+def get_page_directories(result_dir):
+    page_dirs = []
+
+    try:
+        entries = os.listdir(result_dir)
+    except OSError as e:
+        logger.warning(f"Failed to list result directory: {e}")
+        return []
+
+    for entry in entries:
+        full_path = os.path.join(result_dir, entry)
+        if os.path.isdir(full_path) and entry.startswith('page_'):
+            match = re.search(r'page_(\d+)', entry)
+            if match:
+                page_num = int(match.group(1))
+                page_dirs.append((page_num, full_path))
+
+    page_dirs.sort(key=lambda x: x[0])
+    return [path for _, path in page_dirs]
+
+def collect_files_from_pages(page_dirs, return_type):
+    suffix_map = {
+        "content_list_json": "_content_list.json",
+        "middle_json": "_middle.json",
+        "model_pdf": "_model.pdf",
+        "layout_pdf": "_layout.pdf",
+        "spans_pdf": "_spans.pdf"
+    }
+
+    suffix = suffix_map.get(return_type)
+    if not suffix:
+        return []
+
+    collected_files = []
+
+    for page_idx, page_dir in enumerate(page_dirs):
+        found = False
+        for root, dirs, filenames in os.walk(page_dir):
+            for filename in filenames:
+                if filename.endswith(suffix):
+                    file_path = os.path.join(root, filename)
+                    parent_dir = os.path.dirname(os.path.dirname(file_path))
+                    rel_path = os.path.relpath(file_path, parent_dir)
+                    collected_files.append((page_idx, file_path, rel_path))
+                    found = True
+                    break
+            if found:
+                break
+
+        if not found:
+            logger.warning(f"No {suffix} file found in page directory {page_dir}")
+
+    return collected_files
+
+def create_zip_from_files(files, return_type):
+    buffer = io.BytesIO()
+
+    with zipfile.ZipFile(buffer, 'w', zipfile.ZIP_DEFLATED) as zipf:
+        for page_idx, file_path, rel_path in files:
+            with open(file_path, 'rb') as f:
+                file_content = f.read()
+            zipf.writestr(rel_path, file_content)
+
+    buffer.seek(0)
+    zip_data = buffer.read()
+    base64_data = base64.b64encode(zip_data).decode('utf-8')
+
+    return base64_data
+
 async def get_specific_content(result_dir, return_type, original_name, split_pages):
     """Get specific content from result directory based on return_type"""
     def read_content_sync():
+        if split_pages:
+            page_dirs = get_page_directories(result_dir)
+
+            if page_dirs:
+                collected_files = collect_files_from_pages(page_dirs, return_type)
+
+                if not collected_files:
+                    return f"No {return_type} files found in page directories", "text/plain"
+
+                base64_zip = create_zip_from_files(collected_files, return_type)
+                return base64_zip, "application/zip"
+
         if return_type == "content_list_json":
             for root, dirs, filenames in os.walk(result_dir):
                 for filename in filenames:
@@ -550,7 +634,6 @@ async def get_specific_content(result_dir, return_type, original_name, split_pag
                     if filename.endswith(pdf_suffix):
                         file_path = os.path.join(root, filename)
                         with open(file_path, 'rb') as f:
-                            import base64
                             pdf_data = f.read()
                             base64_data = base64.b64encode(pdf_data).decode('utf-8')
                             return base64_data, "application/pdf"
