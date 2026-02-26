@@ -154,6 +154,11 @@ class BatchAnalyzeLLM:
             f'LMM ocr time: {round(time.time() - lmm_ocr_start, 2)}, image num: {len(images)}'
         )
 
+        # Ensure ori_layout_results is defined for all model types.
+        # For models where ori_layout_results was not set earlier (e.g., DocLayout_YOLO),
+        # fall back to the current images_layout_res.
+        if 'ori_layout_results' not in locals():
+            ori_layout_results = images_layout_res
         layout_bboxes = []
         for layout_res in ori_layout_results:
             bboxes = []
