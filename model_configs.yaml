@@ -1,17 +1,14 @@
 device: cuda # cuda / cpu / mps (using `transformers` as backend)
 weights:
-  doclayout_yolo: Structure/doclayout_yolo_docstructbench_imgsz1280_2501.pt # or Structure/layout_zh.pt
-  PP-DocLayout_plus-L: Structure/PP-DocLayout_plus-L
   PP-DocLayoutV2: Structure/PP-DocLayoutV2
-  layoutreader: Relation
   layoutreader_v20: Relation
 models_dir: model_weight
 layout_config:
-  model: PP-DocLayoutV2 # PP-DocLayoutV2 (MonkeyOCR-pro) / doclayout_yolo (MonkeyOCR)
+  model: PP-DocLayoutV2
   reader:
     name: layoutreader_v20
 chat_config:
-  weight_path: model_weight/Recognition-pro
+  weight_path: model_weight/Recognition
   backend: lmdeploy # lmdeploy / vllm / transformers / api / lmdeploy_queue / vllm_queue / vllm_async
   data_parallelism: 1 # for lmdeploy only (test)
   model_parallelism: 1 # for lmdeploy and vllm
