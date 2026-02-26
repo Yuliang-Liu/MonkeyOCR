@@ -323,8 +323,10 @@ def parse_multi_file_group(file_paths, output_dir, MonkeyOCR_model, base_folder_
                 file_pipe_result.draw_span(os.path.join(file_local_md_dir, f"{file_name}_spans.pdf"))
                 file_pipe_result.dump_content_list(file_md_writer, f"{file_name}_content_list.json", image_dir)
                 file_pipe_result.dump_middle_json(file_md_writer, f'{file_name}_middle.json')
-            except:
-                pass
+            except Exception:
+                # Log the exception but continue processing other files
+                print(f"Error while saving results for file '{file_name}'. Skipping this file's outputs.", file=sys.stderr)
+                traceback.print_exc()
 
     parsing_time = time.time() - start_time
     print(f"Parsing and saving time: {parsing_time:.2f}s")
