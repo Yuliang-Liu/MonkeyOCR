@@ -408,7 +408,7 @@ def sort_lines_by_ppv2(fix_blocks, layout_bboxes):
     sorted_bboxes = []
     sorted_index = [-1] * len(fix_blocks)
     fix_bboxes = [fix_block['bbox'] for fix_block in fix_blocks]
-    for i,fix_bbox in enumerate(fix_bboxes):
+    for i, fix_bbox in enumerate(fix_bboxes):
         if fix_bbox in layout_bboxes:
             sorted_index[i] = layout_bboxes.index(fix_bbox)
         else:
