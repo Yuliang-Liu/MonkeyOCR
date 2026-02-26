@@ -38,7 +38,7 @@ def doc_analyze_llm(
             images.append(img_dict['img'])
     
     logger.info(f'images load time: {round(time.time() - doc_analyze_start, 2)}')
-    analyze_result = batch_model(images, split_pages=split_pages or split_files, pred_abandon=pred_abandon)
+    analyze_result, layout_result = batch_model(images, split_pages=split_pages or split_files, pred_abandon=pred_abandon)
 
     # Handle MultiFileDataset with split_files
     if split_files and isinstance(dataset, MultiFileDataset):
@@ -90,7 +90,7 @@ def doc_analyze_llm(
                 else:
                     # For file-level results, use relative page numbers starting from 0
                     page_info = {'page_no': page_idx, 'height': page_height, 'width': page_width}
-                    page_dict = {'layout_dets': result, 'page_info': page_info}
+                    page_dict = {'layout_dets': result, 'page_info': page_info, 'layout_bboxes': layout_result[global_page_idx]}
                     file_model_json.append(page_dict)
             
             if not split_pages:
@@ -124,7 +124,7 @@ def doc_analyze_llm(
                 inference_results.append(inference_result)
             else:
                 page_info = {'page_no': index, 'height': page_height, 'width': page_width}
-                page_dict = {'layout_dets': result, 'page_info': page_info}
+                page_dict = {'layout_dets': result, 'page_info': page_info, 'layout_bboxes': layout_result[index]}
                 model_json.append(page_dict)
         if not split_pages:
             inference_results = InferenceResultLLM(model_json, dataset)

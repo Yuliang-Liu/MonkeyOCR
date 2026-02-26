@@ -1,5 +1,6 @@
 import copy
 import math
+import os
 import re
 import statistics
 import time
@@ -288,11 +289,14 @@ def txt_spans_extract_v2(pdf_page, spans, all_bboxes, all_discarded_blocks, lang
     return spans
 
 
-def do_predict(boxes: List[List[int]], model) -> List[int]:
+def do_predict(boxes: List[List[int]], categorys: List[int], model) -> List[int]:
     from magic_pdf.model.sub_modules.reading_oreder.layoutreader.helpers import (
-        boxes2inputs, parse_logits, prepare_inputs)
+        boxes2inputs, catogorys2inputs, parse_logits, prepare_inputs)
+    from magic_pdf.model.sub_modules.reading_oreder.layoutreader.helpers import LayoutLMv3WithCategoryEmbedding, LayoutLMv3WithCategoryEmbeddingV20
 
     inputs = boxes2inputs(boxes)
+    if isinstance(model, LayoutLMv3WithCategoryEmbedding) or isinstance(model, LayoutLMv3WithCategoryEmbeddingV20):
+        inputs.update(catogorys2inputs(categorys))
     inputs = prepare_inputs(inputs, model)
     logits = model(**inputs).logits.cpu().squeeze(0)
     return parse_logits(logits, len(boxes))
@@ -385,6 +389,43 @@ def insert_lines_into_block(block_bbox, line_height, page_w, page_h):
     else:
         return [[x0, y0, x1, y1]]
 
+def sort_lines_by_ppv2(fix_blocks, layout_bboxes):
+    def iou(box1, box2):
+        x1 = max(box1[0], box2[0])
+        y1 = max(box1[1], box2[1])
+        x2 = min(box1[2], box2[2])
+        y2 = min(box1[3], box2[3])
+
+        intersection = max(0, x2 - x1) * max(0, y2 - y1)
+        box1_area = (box1[2] - box1[0]) * (box1[3] - box1[1])
+        box2_area = (box2[2] - box2[0]) * (box2[3] - box2[1])
+        union = box1_area + box2_area - intersection
+
+        if union == 0:
+            return 0.0
+        else:
+            return intersection / union
+    sorted_bboxes = []
+    sorted_index = [-1] * len(fix_blocks)
+    fix_bboxes = [fix_block['bbox'] for fix_block in fix_blocks]
+    for i,fix_bbox in enumerate(fix_bboxes):
+        if fix_bbox in layout_bboxes:
+            sorted_index[i] = layout_bboxes.index(fix_bbox)
+        else:
+            max_iou = 0.0
+            max_iou_index = -1
+            for j, layout_bbox in enumerate(layout_bboxes):
+                current_iou = iou(fix_bbox, layout_bbox)
+                if current_iou > max_iou:
+                    max_iou = current_iou
+                    max_iou_index = j
+            if max_iou < 0.5:
+                logger.warning(f'Cannot find matching layout bbox for fix_bbox: {fix_bbox}, max_iou: {max_iou}')
+            sorted_index[i] = max_iou_index
+    
+    sorted_order = sorted(range(len(fix_bboxes)), key=lambda k: sorted_index[k] if sorted_index[k] >= 0 else float('inf'))
+    sorted_bboxes = [fix_bboxes[i] for i in sorted_order]
+    return sorted_bboxes
 
 def sort_lines_by_model(fix_blocks, page_w, page_h, line_height, MonkeyOCR_model):
     page_line_list = []
@@ -399,7 +440,8 @@ def sort_lines_by_model(fix_blocks, page_w, page_h, line_height, MonkeyOCR_model
     for block in fix_blocks:
         page_line_list.append(block['bbox'])
 
-    if len(page_line_list) > 200:
+    if len(page_line_list) > 300:
+        logger.warning(f"Boxes len: {len(page_line_list)} too many, skip sort by model")
         return None
 
 
@@ -439,7 +481,8 @@ def sort_lines_by_model(fix_blocks, page_w, page_h, line_height, MonkeyOCR_model
         boxes.append([left, top, right, bottom])
     model = MonkeyOCR_model.layoutreader_model
     with torch.no_grad():
-        orders = do_predict(boxes, model)
+        categorys = [block['type'] for block in fix_blocks]
+        orders = do_predict(boxes, categorys, model)
     sorted_bboxes = [page_line_list[i] for i in orders]
 
     return sorted_bboxes
@@ -727,7 +770,10 @@ def parse_page_core(
 
     line_height = get_line_height(fix_blocks)
 
-    sorted_bboxes = sort_lines_by_model(fix_blocks, page_w, page_h, line_height, MonkeyOCR_model)
+    if os.getenv('MONKEYOCR_SORT_BY_PPV2', '0') == '1':
+        sorted_bboxes = sort_lines_by_ppv2(fix_blocks, magic_model.get_model_list(page_id)['layout_bboxes'])
+    else:
+        sorted_bboxes = sort_lines_by_model(fix_blocks, page_w, page_h, line_height, MonkeyOCR_model)
 
     fix_blocks = cal_block_index(fix_blocks, sorted_bboxes)
 

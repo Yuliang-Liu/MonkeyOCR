@@ -49,7 +49,7 @@ def load_image_from_base64(image: Union[bytes, str]) -> Image.Image:
     return Image.open(BytesIO(base64.b64decode(image)))
 
 
-def load_image(image_url: Union[str, Image.Image], max_size: int = None, min_size: int = None) -> Image.Image:
+def load_image(image_url: Union[str, Image.Image], max_pixels: int = None, max_size: int = None, min_size: int = None) -> Image.Image:
     """load image from url, local path or openai GPT4V."""
     FETCH_TIMEOUT = int(os.environ.get('LMDEPLOY_FETCH_TIMEOUT', 10))
     headers = {
@@ -81,6 +81,10 @@ def load_image(image_url: Union[str, Image.Image], max_size: int = None, min_siz
             img = img.resize(new_size, Image.LANCZOS)
 
         # resize image if too large
+        if max_pixels and img.size[0] * img.size[1] > max_pixels:
+            scale = (max_pixels / (img.size[0] * img.size[1])) ** 0.5
+            new_size = (int(img.size[0] * scale), int(img.size[1] * scale))
+            img = img.resize(new_size, Image.LANCZOS)
         if max_size and max(img.size) > max_size:
             scale = max_size / max(img.size)
             new_size = (int(img.size[0] * scale), int(img.size[1] * scale))

@@ -17,7 +17,7 @@ TASK_INSTRUCTIONS = {
     'table': 'This is the image of a table. Please output the table in html format.'
 }
 
-def parse_folder(folder_path, output_dir, config_path, task=None, split_pages=False, group_size=None, pred_abandon=False):
+def parse_folder(folder_path, output_dir, config_path, task=None, split_pages=False, group_size=None, pred_abandon=False, skip_processed: bool = False, reverse_order: bool = False):
     """
     Parse all PDF and image files in a folder
     
@@ -27,12 +27,11 @@ def parse_folder(folder_path, output_dir, config_path, task=None, split_pages=Fa
         config_path: Configuration file path
         task: Optional task type for single task recognition
         group_size: Number of files to group together by total page count (None means process individually)
+        skip_processed: If True, skip files whose output folder already exists
     """
     print(f"Starting to parse folder: {folder_path}")
-    
-    # Record start time for total processing time
     total_start_time = time.time()
-    
+
     # Check if folder exists
     if not os.path.exists(folder_path):
         raise FileNotFoundError(f"Folder does not exist: {folder_path}")
@@ -51,23 +50,52 @@ def parse_folder(folder_path, output_dir, config_path, task=None, split_pages=Fa
             if file_ext in supported_extensions:
                 all_files.append(file_path)
     
-    all_files.sort()
-    
+    all_files.sort(reverse=reverse_order)
+
+    # NEW: skip already processed files by checking expected output folder
+    skipped_files = []
+    if skip_processed:
+        def _expected_output_dir(file_path: str) -> str:
+            file_name = '.'.join(os.path.basename(file_path).split(".")[:-1])
+            rel_path = os.path.relpath(os.path.dirname(file_path), folder_path)
+            if rel_path == '.':
+                return os.path.join(output_dir, file_name)
+            return os.path.join(output_dir, rel_path, file_name)
+
+        pending_files = []
+        for fp in all_files:
+            out_dir = _expected_output_dir(fp)
+            if os.path.exists(out_dir):
+                skipped_files.append(fp)
+                print(f"Skipping (already exists): {fp} -> {out_dir}")
+            else:
+                pending_files.append(fp)
+        all_files = pending_files
+
+        if not all_files:
+            print("All files are already processed (or output folders exist). Nothing to do.")
+            return output_dir
+
     # Initialize model once for all files
     print("Loading model...")
     MonkeyOCR_model = MonkeyOCR(config_path)
-    
+
     successful_files = []
     failed_files = []
-    
+
     if group_size and group_size > 1:
         # Group files by total page count
         print(f"Found {len(all_files)} files to process in groups with max {group_size} total pages")
-        
+
         file_groups = create_file_groups_by_page_count(all_files, group_size)
         print(f"Created {len(file_groups)} file groups")
-        
+
         for i, file_group in enumerate(file_groups, 1):
+            # NEW: group 可能为空（极端情况下），直接跳过
+            if not file_group:
+                print(f"Skipping empty file group {i}/{len(file_groups)}")
+                continue
+
             print(f"\n{'='*60}")
             print(f"Processing file group {i}/{len(file_groups)} (contains {len(file_group)} files)")
             for file_path in file_group:
@@ -82,7 +110,7 @@ def parse_folder(folder_path, output_dir, config_path, task=None, split_pages=Fa
 
                 successful_files.extend(file_group)
                 print(f"✅ Successfully processed file group {i}")
-                
+
             except Exception as e:
                 failed_files.extend([(path, str(e)) for path in file_group])
                 print(f"❌ Failed to process file group {i}: {str(e)}")
@@ -102,31 +130,32 @@ def parse_folder(folder_path, output_dir, config_path, task=None, split_pages=Fa
                     result_dir = single_task_recognition(file_path, output_dir, MonkeyOCR_model, task)
                 else:
                     result_dir = parse_file(file_path, output_dir, MonkeyOCR_model, pred_abandon=pred_abandon)
-                
+
                 successful_files.append(file_path)
                 print(f"✅ Successfully processed: {os.path.basename(file_path)}")
-                
+
             except Exception as e:
                 failed_files.append((file_path, str(e)))
                 print(f"❌ Failed to process {os.path.basename(file_path)}: {str(e)}")
-    
-    if not all_files:
+
+    if not all_files and not skipped_files:
         print("No supported files found in the folder.")
         return
-    
+
     # Calculate total processing time
     total_processing_time = time.time() - total_start_time
-    
+
     # Summary
     total_files = len(all_files)
     print(f"\n{'='*60}")
     print("PROCESSING SUMMARY")
     print(f"{'='*60}")
-    print(f"Total files: {total_files}")
+    print(f"Total files found: {len(successful_files) + len(failed_files) + len(skipped_files)}")
     print(f"Successful: {len(successful_files)}")
     print(f"Failed: {len(failed_files)}")
+    print(f"Skipped (already exists): {len(skipped_files)}")
     print(f"Total processing time: {total_processing_time:.2f}s")
-    
+
     if failed_files:
         print("\nFailed files:")
         for file_path, error in failed_files:
@@ -287,12 +316,15 @@ def parse_multi_file_group(file_paths, output_dir, MonkeyOCR_model, base_folder_
             file_pipe_result = file_infer_result.pipe_ocr_mode(file_image_writer, MonkeyOCR_model=MonkeyOCR_model)
             
             # Save file-specific results using original file name
-            file_infer_result.draw_model(os.path.join(file_local_md_dir, f"{file_name}_model.pdf"))
-            file_pipe_result.draw_layout(os.path.join(file_local_md_dir, f"{file_name}_layout.pdf"))
-            file_pipe_result.draw_span(os.path.join(file_local_md_dir, f"{file_name}_spans.pdf"))
-            file_pipe_result.dump_md(file_md_writer, f"{file_name}.md", image_dir)
-            file_pipe_result.dump_content_list(file_md_writer, f"{file_name}_content_list.json", image_dir)
-            file_pipe_result.dump_middle_json(file_md_writer, f'{file_name}_middle.json')
+            try:
+                file_pipe_result.dump_md(file_md_writer, f"{file_name}.md", image_dir)
+                file_infer_result.draw_model(os.path.join(file_local_md_dir, f"{file_name}_model.pdf"))
+                file_pipe_result.draw_layout(os.path.join(file_local_md_dir, f"{file_name}_layout.pdf"))
+                file_pipe_result.draw_span(os.path.join(file_local_md_dir, f"{file_name}_spans.pdf"))
+                file_pipe_result.dump_content_list(file_md_writer, f"{file_name}_content_list.json", image_dir)
+                file_pipe_result.dump_middle_json(file_md_writer, f'{file_name}_middle.json')
+            except:
+                pass
 
     parsing_time = time.time() - start_time
     print(f"Parsing and saving time: {parsing_time:.2f}s")
@@ -685,6 +717,18 @@ Usage examples:
         help="Enable predicting abandon elements like footer and header (default: False)"
     )
     
+    parser.add_argument(
+        "--skip-processed",
+        action="store_true",
+        help="Skip files whose output folder already exists (default: False)"
+    )
+
+    parser.add_argument(
+        "--reverse-order",
+        action="store_true",
+        help="Parse files in reverse order when processing folders (default: False)"
+    )
+
     args = parser.parse_args()
 
     if args.merge_blocks:
@@ -697,13 +741,15 @@ Usage examples:
         if os.path.isdir(args.input_path):
             # Process folder
             result_dir = parse_folder(
-                folder_path = args.input_path,
-                output_dir = args.output,
-                config_path = args.config,
-                task = args.task,
-                split_pages = args.split_pages,
-                group_size = args.group_size,
-                pred_abandon = args.pred_abandon
+                folder_path=args.input_path,
+                output_dir=args.output,
+                config_path=args.config,
+                task=args.task,
+                split_pages=args.split_pages,
+                group_size=args.group_size,
+                pred_abandon=args.pred_abandon,
+                skip_processed=args.skip_processed,
+                reverse_order=args.reverse_order
             )
             
             if args.task:

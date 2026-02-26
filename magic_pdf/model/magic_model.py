@@ -51,6 +51,17 @@ class MagicModel:
                     need_remove_list.append(layout_det)
             for need_remove in need_remove_list:
                 layout_dets.remove(need_remove)
+            new_bboxes = []
+            for bboxes in model_page_info['layout_bboxes']:
+                x0, y0, x1, y1 = bboxes
+                bbox = [
+                    int(x0 / horizontal_scale_ratio),
+                    int(y0 / vertical_scale_ratio),
+                    int(x1 / horizontal_scale_ratio),
+                    int(y1 / vertical_scale_ratio),
+                ]
+                new_bboxes.append(bbox)
+            model_page_info['layout_bboxes'] = new_bboxes
 
     def __fix_by_remove_low_confidence(self):
         for model_page_info in self.__model_list:

@@ -1,11 +1,9 @@
-import base64
-import copy
 import time
+from copy import deepcopy
 
 from loguru import logger
 
 from magic_pdf.config.constants import MODEL_NAME
-from io import BytesIO
 from PIL import Image
 from magic_pdf.model.sub_modules.model_utils import (
     clean_vram, crop_img)
@@ -32,7 +30,7 @@ class BatchAnalyzeLLM:
                 layout_images, YOLO_LAYOUT_BASE_BATCH_SIZE
             )
                             
-        elif self.model.layout_model_name == MODEL_NAME.PaddleXLayoutModel:
+        elif self.model.layout_model_name in [MODEL_NAME.PaddleXLayoutModel, MODEL_NAME.PP_DoclayoutV2]:
             # PP-DocLayout_plus-L
             paddlex_layout_images = []
             for image_index, image in enumerate(images):
@@ -41,6 +39,7 @@ class BatchAnalyzeLLM:
             layout_results = self.model.layout_model.batch_predict(
                 paddlex_layout_images, YOLO_LAYOUT_BASE_BATCH_SIZE 
             )
+            ori_layout_results = deepcopy(layout_results)
             
             images_layout_res += layout_results
         else: 
@@ -131,13 +130,13 @@ class BatchAnalyzeLLM:
                 res = layout_res[i]
                 ocr = ocr_result[page_idxs[index]+i]
                 if res['category_id'] in [8, 14]:
-                    temp_res = copy.deepcopy(res)
+                    temp_res = deepcopy(res)
                     temp_res['category_id'] = 14
                     temp_res['score'] = 1.0
                     temp_res['latex'] = ocr
                     ocr_results.append(temp_res)
                 elif res['category_id'] in [0, 1, 2, 4, 6, 7, 101]:
-                    temp_res = copy.deepcopy(res)
+                    temp_res = deepcopy(res)
                     temp_res['category_id'] = 15
                     temp_res['score'] = 1.0
                     temp_res['text'] = ocr
@@ -155,13 +154,20 @@ class BatchAnalyzeLLM:
             f'LMM ocr time: {round(time.time() - lmm_ocr_start, 2)}, image num: {len(images)}'
         )
 
-        return images_layout_res
+        layout_bboxes = []
+        for layout_res in ori_layout_results:
+            bboxes = []
+            for res in layout_res:
+                bboxes.append([res['poly'][0], res['poly'][1], res['poly'][4], res['poly'][5]])
+            layout_bboxes.append(bboxes)
+
+        return images_layout_res, layout_bboxes
 
     def batch_lmm_ocr(self, images, cat_ids, version='lmdeploy'):
         def sanitize_md(output):
             return output.replace('<md>', '').replace('</md>', '').replace('md\n','').strip()
         def sanitize_mf(output:str):
-            return output.replace('$$', '').strip('$').strip()
+            return output.replace('$$', '\$\$').strip('$').strip()
         def sanitize_html(output):
             output = output.replace('```html','').replace('```','').replace('<html>','').replace('</html>','').strip()
             if not output.endswith('</table>'):

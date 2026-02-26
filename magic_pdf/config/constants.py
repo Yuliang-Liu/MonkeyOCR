@@ -39,6 +39,7 @@ PP_DET_DIRECTORY = '.paddleocr/whl/det/ch/ch_PP-OCRv4_det_infer'
 class MODEL_NAME:
     DocLayout_YOLO = 'doclayout_yolo'
     PaddleXLayoutModel = 'PP-DocLayout_plus-L'
+    PP_DoclayoutV2 = 'PP-DocLayoutV2'
 
 PARSE_TYPE_TXT = 'txt'
 PARSE_TYPE_OCR = 'ocr'

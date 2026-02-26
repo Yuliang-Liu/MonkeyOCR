@@ -14,11 +14,41 @@ def doclayout_yolo_model_init(weight, device='cpu'):
     return model
 
 
-def paddex_layout_model_init(device: str, model_dir: str = None):
+def paddex_layout_model_init(device: str, model_dir: str = None, model_name: str = MODEL_NAME.PaddleXLayoutModel):
     from magic_pdf.model.sub_modules.layout.paddlex_layout.PaddleXLayoutModel import \
         PaddleXLayoutModelWrapper
-    model = PaddleXLayoutModelWrapper(model_name=MODEL_NAME.PaddleXLayoutModel, device=device, model_dir=model_dir)
+    model = PaddleXLayoutModelWrapper(model_name=model_name, device=device, model_dir=model_dir)
     return model
+
+
+def ocr_model_init(det_db_box_thresh=0.3,
+                   lang=None,
+                   use_dilation=True,
+                   det_db_unclip_ratio=1.8,
+                   ):
+    from magic_pdf.model.sub_modules.ocr.paddleocr2pytorch.pytorch_paddle import PytorchPaddleOCR
+    if lang is not None and lang != '':
+        model = PytorchPaddleOCR(
+            det_db_box_thresh=det_db_box_thresh,
+            lang=lang,
+            use_dilation=use_dilation,
+            det_db_unclip_ratio=det_db_unclip_ratio,
+        )
+    else:
+        model = PytorchPaddleOCR(
+            det_db_box_thresh=det_db_box_thresh,
+            use_dilation=use_dilation,
+            det_db_unclip_ratio=det_db_unclip_ratio,
+        )
+    return model
+
+
+def mfd_model_init(weight, device='cpu'):
+    from magic_pdf.model.sub_modules.mfd.yolo_v8 import YOLOv8MFDModel
+    if str(device).startswith('npu'):
+        device = torch.device(device)
+    mfd_model = YOLOv8MFDModel(weight, device)
+    return mfd_model
 
 
 class AtomModelSingleton:
@@ -52,14 +82,25 @@ def atom_model_init(model_name: str, **kwargs):
                 kwargs.get('doclayout_yolo_weights'),
                 kwargs.get('device')
             )
-        elif kwargs.get('layout_model_name') == MODEL_NAME.PaddleXLayoutModel:
+        elif kwargs.get('layout_model_name') in [MODEL_NAME.PaddleXLayoutModel, MODEL_NAME.PP_DoclayoutV2]:
             atom_model = paddex_layout_model_init(
+                model_name=kwargs.get('layout_model_name'),
                 model_dir=kwargs.get('paddlexlayout_model_dir'),
                 device=kwargs.get('device')
             )
         else:
             logger.error('layout model name not allowed')
             exit(1)
+    elif model_name == AtomicModel.OCR:
+        atom_model = ocr_model_init(
+            kwargs.get('det_db_box_thresh'),
+            kwargs.get('lang'),
+        )
+    elif model_name == AtomicModel.MFD:
+        atom_model = mfd_model_init(
+            kwargs.get('mfd_weights'),
+            kwargs.get('device')
+        )
     else:
         logger.error('model name not allowed')
         exit(1)

@@ -2,12 +2,48 @@ from collections import defaultdict
 from typing import List, Dict
 
 import torch
+import torch.nn as nn
 from transformers import LayoutLMv3ForTokenClassification
+from magic_pdf.config.ocr_content_type import CategoryId
 
 MAX_LEN = 510
 CLS_TOKEN_ID = 0
 UNK_TOKEN_ID = 3
 EOS_TOKEN_ID = 2
+
+
+class LayoutLMv3WithCategoryEmbedding(LayoutLMv3ForTokenClassification):
+    def __init__(self, config, num_category: int = 8):
+        super().__init__(config)
+        self.category_embedding = nn.Embedding(num_category, config.hidden_size, padding_idx=7)
+        nn.init.constant_(self.category_embedding.weight, 0.0)
+        self.category_embedding.weight.requires_grad = True
+
+    def forward(self, input_ids=None, bbox=None, attention_mask=None, labels=None, category_ids=None, **kwargs):
+        inputs_embeds = self.category_embedding(category_ids)  # (bs, seq_len, hidden_size)
+        return super().forward(
+            input_ids=input_ids,
+            inputs_embeds=inputs_embeds,
+            bbox=bbox,
+            attention_mask=attention_mask,
+            labels=labels,
+        )
+
+class LayoutLMv3WithCategoryEmbeddingV20(LayoutLMv3ForTokenClassification):
+    def __init__(self, config, num_category: int = 8):
+        super().__init__(config)
+        self.category_embedding = nn.Embedding(num_category, config.hidden_size, padding_idx=7)
+
+    def forward(self, input_ids=None, bbox=None, attention_mask=None, labels=None, category_ids=None, **kwargs):
+        # import pdb; pdb.set_trace()
+        inputs_embeds = self.layoutlmv3.embeddings.word_embeddings(input_ids) + self.category_embedding(category_ids) # (bs, seq_len, hidden_size)
+        return super().forward(
+            input_ids=input_ids,
+            inputs_embeds=inputs_embeds,
+            bbox=bbox,
+            attention_mask=attention_mask,
+            labels=labels,
+        )
 
 
 class DataCollator:
@@ -72,6 +108,36 @@ def boxes2inputs(boxes: List[List[int]]) -> Dict[str, torch.Tensor]:
         "attention_mask": torch.tensor([attention_mask]),
         "input_ids": torch.tensor([input_ids]),
     }
+
+
+def catogorys2inputs(categorys: List[int]) -> Dict[str, torch.Tensor]:
+    mapping1 = {
+        "title": 0,
+        "text": 1,
+        "image_body": 2,
+        "image_caption": 3,
+        "table_body": 4,
+        "table_caption": 5,
+        "interline_equation": 6,
+    }
+    mapping2 = {
+        CategoryId.Title: mapping1["title"],
+        CategoryId.Text: mapping1["text"],
+        CategoryId.Abandon: mapping1["text"],
+        CategoryId.ImageBody: mapping1["image_body"],
+        CategoryId.ImageCaption: mapping1["image_caption"],
+        CategoryId.TableBody: mapping1["table_body"],
+        CategoryId.TableCaption: mapping1["table_caption"],
+        CategoryId.TableFootnote: mapping1["text"],
+        CategoryId.InterlineEquation_Layout: mapping1["interline_equation"],
+        CategoryId.InlineEquation: mapping1["text"],
+        CategoryId.InterlineEquation_YOLO: mapping1["interline_equation"],
+        CategoryId.OcrText: mapping1["text"],
+        CategoryId.ImageFootnote: mapping1["text"],
+    }
+    category_ids = [mapping1[cat] for cat in categorys]
+    category_ids = torch.tensor([ [7] + category_ids + [7] ])  # 7 is padding_idx
+    return {"category_ids": category_ids}
 
 
 def prepare_inputs(
