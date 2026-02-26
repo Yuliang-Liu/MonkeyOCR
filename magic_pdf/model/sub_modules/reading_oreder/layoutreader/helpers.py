@@ -35,7 +35,6 @@ class LayoutLMv3WithCategoryEmbeddingV20(LayoutLMv3ForTokenClassification):
         self.category_embedding = nn.Embedding(num_category, config.hidden_size, padding_idx=7)
 
     def forward(self, input_ids=None, bbox=None, attention_mask=None, labels=None, category_ids=None, **kwargs):
-        # import pdb; pdb.set_trace()
         inputs_embeds = self.layoutlmv3.embeddings.word_embeddings(input_ids) + self.category_embedding(category_ids) # (bs, seq_len, hidden_size)
         return super().forward(
             input_ids=input_ids,
