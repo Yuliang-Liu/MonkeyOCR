@@ -35,7 +35,6 @@ class LayoutLMv3WithCategoryEmbeddingV20(LayoutLMv3ForTokenClassification):
         self.category_embedding = nn.Embedding(num_category, config.hidden_size, padding_idx=7)
 
     def forward(self, input_ids=None, bbox=None, attention_mask=None, labels=None, category_ids=None, **kwargs):
-        # import pdb; pdb.set_trace()
         inputs_embeds = self.layoutlmv3.embeddings.word_embeddings(input_ids) + self.category_embedding(category_ids) # (bs, seq_len, hidden_size)
         return super().forward(
             input_ids=input_ids,
@@ -135,8 +134,11 @@ def catogorys2inputs(categorys: List[int]) -> Dict[str, torch.Tensor]:
         CategoryId.OcrText: mapping1["text"],
         CategoryId.ImageFootnote: mapping1["text"],
     }
-    category_ids = [mapping1[cat] for cat in categorys]
-    category_ids = torch.tensor([ [7] + category_ids + [7] ])  # 7 is padding_idx
+    # Map incoming CategoryId/int values to the coarse category indices.
+    # Use "text" as a safe default for any unsupported or unknown categories.
+    default_category_id = mapping1["text"]
+    category_ids = [mapping2.get(cat, default_category_id) for cat in categorys]
+    category_ids = torch.tensor([[7] + category_ids + [7]])  # 7 is padding_idx
     return {"category_ids": category_ids}
 
 
