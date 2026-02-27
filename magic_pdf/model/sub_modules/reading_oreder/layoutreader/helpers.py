@@ -16,23 +16,6 @@ class LayoutLMv3WithCategoryEmbedding(LayoutLMv3ForTokenClassification):
     def __init__(self, config, num_category: int = 8):
         super().__init__(config)
         self.category_embedding = nn.Embedding(num_category, config.hidden_size, padding_idx=7)
-        nn.init.constant_(self.category_embedding.weight, 0.0)
-        self.category_embedding.weight.requires_grad = True
-
-    def forward(self, input_ids=None, bbox=None, attention_mask=None, labels=None, category_ids=None, **kwargs):
-        inputs_embeds = self.category_embedding(category_ids)  # (bs, seq_len, hidden_size)
-        return super().forward(
-            input_ids=input_ids,
-            inputs_embeds=inputs_embeds,
-            bbox=bbox,
-            attention_mask=attention_mask,
-            labels=labels,
-        )
-
-class LayoutLMv3WithCategoryEmbeddingV20(LayoutLMv3ForTokenClassification):
-    def __init__(self, config, num_category: int = 8):
-        super().__init__(config)
-        self.category_embedding = nn.Embedding(num_category, config.hidden_size, padding_idx=7)
 
     def forward(self, input_ids=None, bbox=None, attention_mask=None, labels=None, category_ids=None, **kwargs):
         inputs_embeds = self.layoutlmv3.embeddings.word_embeddings(input_ids) + self.category_embedding(category_ids) # (bs, seq_len, hidden_size)
