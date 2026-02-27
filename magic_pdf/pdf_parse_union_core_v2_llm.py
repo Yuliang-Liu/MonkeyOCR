@@ -292,10 +292,10 @@ def txt_spans_extract_v2(pdf_page, spans, all_bboxes, all_discarded_blocks, lang
 def do_predict(boxes: List[List[int]], categorys: List[int], model) -> List[int]:
     from magic_pdf.model.sub_modules.reading_oreder.layoutreader.helpers import (
         boxes2inputs, catogorys2inputs, parse_logits, prepare_inputs)
-    from magic_pdf.model.sub_modules.reading_oreder.layoutreader.helpers import LayoutLMv3WithCategoryEmbeddingV20
+    from magic_pdf.model.sub_modules.reading_oreder.layoutreader.helpers import LayoutLMv3WithCategoryEmbedding
 
     inputs = boxes2inputs(boxes)
-    if isinstance(model, LayoutLMv3WithCategoryEmbeddingV20):
+    if isinstance(model, LayoutLMv3WithCategoryEmbedding):
         inputs.update(catogorys2inputs(categorys))
     inputs = prepare_inputs(inputs, model)
     logits = model(**inputs).logits.cpu().squeeze(0)

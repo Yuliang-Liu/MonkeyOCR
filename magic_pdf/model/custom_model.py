@@ -1,3 +1,4 @@
+import json
 import os
 import time
 import torch
@@ -6,7 +7,7 @@ from magic_pdf.model.sub_modules.model_init import AtomModelSingleton
 from magic_pdf.model.model_list import AtomicModel
 from magic_pdf.model.async_vllm import MonkeyChat_vLLM_async
 from magic_pdf.utils.load_image import load_image, encode_image_base64
-from magic_pdf.model.sub_modules.reading_oreder.layoutreader.helpers import LayoutLMv3WithCategoryEmbeddingV20
+from magic_pdf.model.sub_modules.reading_oreder.layoutreader.helpers import LayoutLMv3WithCategoryEmbedding
 from transformers import LayoutLMv3ForTokenClassification
 from loguru import logger
 import yaml
@@ -87,36 +88,25 @@ class MonkeyOCR:
         logger.info(f'layout model loaded: {self.layout_model_name}')
 
 
-        layout_reader_config = self.layout_config.get('reader')
-        self.layout_reader_name = layout_reader_config.get('name')
-        if self.layout_reader_name == 'layoutreader':
-            layoutreader_model_dir = os.path.join(models_dir, self.configs['weights'][self.layout_reader_name])
-            if os.path.exists(layoutreader_model_dir):
-                model = LayoutLMv3ForTokenClassification.from_pretrained(
-                    layoutreader_model_dir
-                )
-            else:
-                raise FileNotFoundError(
-                    f"Reading Order model file not found at '{layoutreader_model_dir}'. "
-                    "Please run 'python tools/download_model.py' to download the required models."
-                )
-
+        self.layoutreader_name = self.layout_config.get('reader').get('name')
+        layoutreader_model_dir = os.path.join(models_dir, self.configs['weights'][self.layoutreader_name])
+        if not os.path.exists(layoutreader_model_dir):
+            raise FileNotFoundError(
+                f"Reading Order model file not found at '{layoutreader_model_dir}'. "
+                "Please run 'python tools/download_model.py' to download the required models."
+            )
+        layoutreader_config = json.load(open(os.path.join(layoutreader_model_dir, 'config.json'), 'r'))
+        layoutreader_arch = layoutreader_config.get('architectures')[0]
+        if layoutreader_arch == 'LayoutLMv3ForTokenClassification':
+            model = LayoutLMv3ForTokenClassification.from_pretrained(layoutreader_model_dir)
             if bf16_supported:
                 model.to(self.device).eval().bfloat16()
             else:
                 model.to(self.device).eval()
-        elif self.layout_reader_name == 'layoutreader_v20':
-            layoutreader_model_dir = os.path.join(models_dir, self.configs['weights'][self.layout_reader_name])
-            if os.path.exists(layoutreader_model_dir):
-                model = LayoutLMv3WithCategoryEmbeddingV20.from_pretrained(
-                    layoutreader_model_dir, num_category=8, num_labels=510, visual_embed=False
-                )
-            else:
-                raise FileNotFoundError(
-                    f"Reading Order model file not found at '{layoutreader_model_dir}'. "
-                    "Please run 'python tools/download_model.py' to download the required models."
-                )
-
+        elif layoutreader_arch == 'LayoutLMv3WithCategoryEmbedding':
+            model = LayoutLMv3WithCategoryEmbedding.from_pretrained(
+                layoutreader_model_dir, num_category=8, num_labels=510, visual_embed=False
+            )
             if bf16_supported:
                 model.to(self.device).eval().bfloat16()
             else:
@@ -124,7 +114,7 @@ class MonkeyOCR:
         else:
             logger.error('model name not allow')
         self.layoutreader_model = model
-        logger.info(f'layoutreader model loaded: {self.layout_reader_name}')
+        logger.info(f'layoutreader model loaded: {self.layoutreader_name, layoutreader_arch}')
 
         self.chat_config = self.configs.get('chat_config', {})
         chat_backend = self.chat_config.get('backend', 'lmdeploy')
