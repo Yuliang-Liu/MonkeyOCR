@@ -6,7 +6,7 @@ from magic_pdf.model.sub_modules.model_init import AtomModelSingleton
 from magic_pdf.model.model_list import AtomicModel
 from magic_pdf.model.async_vllm import MonkeyChat_vLLM_async
 from magic_pdf.utils.load_image import load_image, encode_image_base64
-from magic_pdf.model.sub_modules.reading_oreder.layoutreader.helpers import LayoutLMv3WithCategoryEmbedding, LayoutLMv3WithCategoryEmbeddingV20
+from magic_pdf.model.sub_modules.reading_oreder.layoutreader.helpers import LayoutLMv3WithCategoryEmbeddingV20
 from transformers import LayoutLMv3ForTokenClassification
 from loguru import logger
 import yaml
@@ -94,22 +94,6 @@ class MonkeyOCR:
             if os.path.exists(layoutreader_model_dir):
                 model = LayoutLMv3ForTokenClassification.from_pretrained(
                     layoutreader_model_dir
-                )
-            else:
-                raise FileNotFoundError(
-                    f"Reading Order model file not found at '{layoutreader_model_dir}'. "
-                    "Please run 'python tools/download_model.py' to download the required models."
-                )
-
-            if bf16_supported:
-                model.to(self.device).eval().bfloat16()
-            else:
-                model.to(self.device).eval()
-        elif self.layout_reader_name == 'layoutreader_v2':
-            layoutreader_model_dir = os.path.join(models_dir, self.configs['weights'][self.layout_reader_name])
-            if os.path.exists(layoutreader_model_dir):
-                model = LayoutLMv3WithCategoryEmbedding.from_pretrained(
-                    layoutreader_model_dir, num_category=8, num_labels=510, visual_embed=False
                 )
             else:
                 raise FileNotFoundError(
