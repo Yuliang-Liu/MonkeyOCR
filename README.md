@@ -27,6 +27,14 @@ MonkeyOCR: Document Parsing with a Structure-Recognition-Relation Triplet Paradi
 [![Demo](https://img.shields.io/badge/Demo-blue)](https://aiwrite.wps.cn/pdf/parse/web/)
 >
 
+> **Multimodal OCR: Parse Anything from Documents**<br>
+> Handong Zheng, Yumeng Li, Kaile Zhang, Liang Xin, Guangwei Zhao, Hao Liu, Jiayu Chen, Jie Lou, Qi Fu, Rui Yang, Shuo Jiang, Weijian Luo, Weijie Su, Weijun Zhang, Xingyu Zhu, Yabin Li, Yiwei ma, Yu Chen, Yuqiu Ji, Zhaohui Yu, Guang Yang, Colin Zhang, Lei Zhang, Yuliang Liu, Xiang Bai <br>
+[![arXiv](https://img.shields.io/badge/Arxiv-b31b1b.svg?logo=arXiv)](https://arxiv.org/pdf/2603.13032)
+[![Source_code](https://img.shields.io/badge/Code-Available-white)](https://github.com/rednote-hilab/dots.mocr)
+[![Youtube](https://img.shields.io/badge/Youtube-red)](https://www.youtube.com/watch?v=gkyDZtWGfh8)
+[![Wechat](https://img.shields.io/badge/💬Wechat-green)](https://mp.weixin.qq.com/s/9UAZecpuKBei1Fm3ti3gxQ)
+>
+
 	
 ## News 
 * ```2026.03.15 ``` 🚀 We release [dots.mocr](https://arxiv.org/pdf/2603.13032) Multimodal OCR: Parse Anything from Documents.
@@ -1235,14 +1243,14 @@ If you wish to refer to the baseline results published here, please use the foll
       primaryClass={cs.CV},
       url={https://arxiv.org/abs/2506.05218}, 
 }
-@misc{zhang2025monkeyocrv15technicalreport,
-      title={MonkeyOCR v1.5 Technical Report: Unlocking Robust Document Parsing for Complex Patterns}, 
-      author={Jiarui Zhang and Yuliang Liu and Zijun Wu and Guosheng Pang and Zhili Ye and Yupei Zhong and Junteng Ma and Tao Wei and Haiyang Xu and Weikai Chen and Zeen Wang and Qiangjun Ji and Fanxi Zhou and Qi Zhang and Yuanrui Hu and Jiahao Liu and Zhang Li and Ziyang Zhang and Qiang Liu and Xiang Bai},
-      year={2025},
-      eprint={2511.10390},
+@misc{zheng2026multimodalocrparsedocuments,
+      title={Multimodal OCR: Parse Anything from Documents}, 
+      author={Handong Zheng and Yumeng Li and Kaile Zhang and Liang Xin and Guangwei Zhao and Hao Liu and Jiayu Chen and Jie Lou and Qi Fu and Rui Yang and Shuo Jiang and Weijian Luo and Weijie Su and Weijun Zhang and Xingyu Zhu and Yabin Li and Yiwei ma and Yu Chen and Yuqiu Ji and Zhaohui Yu and Guang Yang and Colin Zhang and Lei Zhang and Yuliang Liu and Xiang Bai},
+      year={2026},
+      eprint={2603.13032},
       archivePrefix={arXiv},
       primaryClass={cs.CV},
-      url={https://arxiv.org/abs/2511.10390}, 
+      url={https://arxiv.org/abs/2603.13032}, 
 }
 ```
 
