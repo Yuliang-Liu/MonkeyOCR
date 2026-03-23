@@ -32,9 +32,9 @@ MonkeyOCR: Document Parsing with a Structure-Recognition-Relation Triplet Paradi
 [![arXiv](https://img.shields.io/badge/Arxiv-b31b1b.svg?logo=arXiv)](https://arxiv.org/pdf/2603.13032)
 [![Source_code](https://img.shields.io/badge/Code-Available-white)](https://github.com/rednote-hilab/dots.mocr)
 [![Youtube](https://img.shields.io/badge/Youtube-red)](https://www.youtube.com/watch?v=gkyDZtWGfh8)
+[![Youtube](https://img.shields.io/badge/Run-dots.mocr-red)](https://www.youtube.com/watch?v=BxH5KD5lDSM)
 [![Wechat](https://img.shields.io/badge/💬Wechat-green)](https://mp.weixin.qq.com/s/9UAZecpuKBei1Fm3ti3gxQ)
 >
-
 	
 ## News 
 * ```2026.03.15 ``` 🚀 We release [dots.mocr](https://arxiv.org/pdf/2603.13032) Multimodal OCR: Parse Anything from Documents.
