@@ -34,6 +34,7 @@ MonkeyOCR: Document Parsing with a Structure-Recognition-Relation Triplet Paradi
 [![Youtube](https://img.shields.io/badge/Youtube-red)](https://www.youtube.com/watch?v=gkyDZtWGfh8)
 [![Youtube](https://img.shields.io/badge/Run-dots.mocr-red)](https://www.youtube.com/watch?v=BxH5KD5lDSM)
 [![Wechat](https://img.shields.io/badge/💬极市平台-black)](https://mp.weixin.qq.com/s/EHNrk5SSCOReyTm7uv6nsg)
+[![HyperAI Demo](https://img.shields.io/badge/HyperAI-Demo-red?logo=hyperledger&logoColor=white)](https://hyper.ai/cn/notebooks/50071)
 >
 	
 ## News 
