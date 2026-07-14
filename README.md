@@ -12,7 +12,7 @@ MonkeyOCR: Document Parsing with a Structure-Recognition-Relation Triplet Paradi
 </div>
 
 
-> **MonkeyOCR: Document Parsing with a Structure-Recognition-Relation Triplet Paradigm**<br>
+> **[SCIENCE CHINA Information Science] MonkeyOCR: Document Parsing with a Structure-Recognition-Relation Triplet Paradigm**<br>
 > Zhang Li, Yuliang Liu, Qiang Liu, Zhiyin Ma, Ziyang Zhang, Shuo Zhang, Zidun Guo, Jiarui Zhang, Xinyu Wang, Xiang Bai <br>
 [![arXiv](https://img.shields.io/badge/Arxiv-b31b1b.svg?logo=arXiv)](https://arxiv.org/abs/2506.05218) 
 [![Source_code](https://img.shields.io/badge/Code-Available-white)](README.md)
@@ -21,23 +21,10 @@ MonkeyOCR: Document Parsing with a Structure-Recognition-Relation Triplet Paradi
 [![Public Courses](https://img.shields.io/badge/Openbayes-yellow)](https://openbayes.com/console/public/tutorials/91ESrGvEvBq)
 [![Demo](https://img.shields.io/badge/Demo-blue)](https://aiwrite.wps.cn/pdf/parse/web/)
 
-> **MonkeyOCR v1.5 Technical Report: Unlocking Robust Document Parsing for Complex Patterns**<br>
-> Jiarui Zhang, Yuliang Liu, Zijun Wu, Guosheng Pang, Zhili Ye, Yupei Zhong, Junteng Ma, Tao Wei, Haiyang Xu, Weikai Chen, Zeen Wang, Qiangjun Ji, Fanxi Zhou, Qi Zhang, Yuanrui Hu, Jiahao Liu, Zhang Li, Ziyang Zhang, Qiang Liu, Xiang Bai <br>
-[![arXiv](https://img.shields.io/badge/Arxiv-b31b1b.svg?logo=arXiv)](https://arxiv.org/pdf/2511.10390) 
-[![Demo](https://img.shields.io/badge/Demo-blue)](https://aiwrite.wps.cn/pdf/parse/web/)
->
-
-> **Multimodal OCR: Parse Anything from Documents**<br>
-> Handong Zheng, Yumeng Li, Kaile Zhang, Liang Xin, Guangwei Zhao, Hao Liu, Jiayu Chen, Jie Lou, Qi Fu, Rui Yang, Shuo Jiang, Weijian Luo, Weijie Su, Weijun Zhang, Xingyu Zhu, Yabin Li, Yiwei ma, Yu Chen, Yuqiu Ji, Zhaohui Yu, Guang Yang, Colin Zhang, Lei Zhang, Yuliang Liu, Xiang Bai <br>
-[![arXiv](https://img.shields.io/badge/Arxiv-b31b1b.svg?logo=arXiv)](https://arxiv.org/pdf/2603.13032)
-[![Source_code](https://img.shields.io/badge/Code-Available-white)](https://github.com/rednote-hilab/dots.mocr)
-[![Youtube](https://img.shields.io/badge/Youtube-red)](https://www.youtube.com/watch?v=gkyDZtWGfh8)
-[![Youtube](https://img.shields.io/badge/Run-dots.mocr-red)](https://www.youtube.com/watch?v=BxH5KD5lDSM)
-[![Wechat](https://img.shields.io/badge/💬极市平台-black)](https://mp.weixin.qq.com/s/EHNrk5SSCOReyTm7uv6nsg)
-[![HyperAI Demo](https://img.shields.io/badge/HyperAI-Demo-red?logo=hyperledger&logoColor=white)](https://hyper.ai/cn/notebooks/50071)
->
 	
 ## News 
+* ```2026.07.13 ``` 🚀 We release [MonkeyOCRv2](https://github.com/Yuliang-Liu/MonkeyOCRv2), A Visual-Text Foundation Model for Document AI.
+* ```2026.07.12 ``` 🚀 MonkeyOCR is accepted by SCIENCE CHINA Information Sciences.
 * ```2026.04.01 ``` 🚀 dots.mocr achieves the best open-source score on [MDPBench](https://arxiv.org/pdf/2603.28130), a 17-language document parsing benchmark!
 * ```2026.03.15 ``` 🚀 We release [dots.mocr](https://arxiv.org/pdf/2603.13032) Multimodal OCR: Parse Anything from Documents.
 * ```2026.01.30 ``` 🚀 We release [MonkeyDoc](https://www.modelscope.cn/datasets/zenosai/MonkeyDoc) and provide the necessary details of our data generation pipeline.
@@ -1230,6 +1217,24 @@ Get a Quick Hands-On Experience with Our Demo:  http://vlrlabmonkey.xyz:8891 (Th
 ### Example for financial report
 <img src="./asserts/Example_for_financial_report_01.png" border="0">
 <img src="./asserts/Example_for_financial_report_02.png" border="0">
+
+## Related Projects
+
+> **MonkeyOCR v1.5 Technical Report: Unlocking Robust Document Parsing for Complex Patterns**<br>
+> Jiarui Zhang, Yuliang Liu, Zijun Wu, Guosheng Pang, Zhili Ye, Yupei Zhong, Junteng Ma, Tao Wei, Haiyang Xu, Weikai Chen, Zeen Wang, Qiangjun Ji, Fanxi Zhou, Qi Zhang, Yuanrui Hu, Jiahao Liu, Zhang Li, Ziyang Zhang, Qiang Liu, Xiang Bai <br>
+[![arXiv](https://img.shields.io/badge/Arxiv-b31b1b.svg?logo=arXiv)](https://arxiv.org/pdf/2511.10390) 
+[![Demo](https://img.shields.io/badge/Demo-blue)](https://aiwrite.wps.cn/pdf/parse/web/)
+>
+
+> **Multimodal OCR: Parse Anything from Documents**<br>
+> Handong Zheng, Yumeng Li, Kaile Zhang, Liang Xin, Guangwei Zhao, Hao Liu, Jiayu Chen, Jie Lou, Qi Fu, Rui Yang, Shuo Jiang, Weijian Luo, Weijie Su, Weijun Zhang, Xingyu Zhu, Yabin Li, Yiwei ma, Yu Chen, Yuqiu Ji, Zhaohui Yu, Guang Yang, Colin Zhang, Lei Zhang, Yuliang Liu, Xiang Bai <br>
+[![arXiv](https://img.shields.io/badge/Arxiv-b31b1b.svg?logo=arXiv)](https://arxiv.org/pdf/2603.13032)
+[![Source_code](https://img.shields.io/badge/Code-Available-white)](https://github.com/rednote-hilab/dots.mocr)
+[![Youtube](https://img.shields.io/badge/Youtube-red)](https://www.youtube.com/watch?v=gkyDZtWGfh8)
+[![Youtube](https://img.shields.io/badge/Run-dots.mocr-red)](https://www.youtube.com/watch?v=BxH5KD5lDSM)
+[![Wechat](https://img.shields.io/badge/💬极市平台-black)](https://mp.weixin.qq.com/s/EHNrk5SSCOReyTm7uv6nsg)
+[![HyperAI Demo](https://img.shields.io/badge/HyperAI-Demo-red?logo=hyperledger&logoColor=white)](https://hyper.ai/cn/notebooks/50071)
+>
 
 ## Citing MonkeyOCR
 
