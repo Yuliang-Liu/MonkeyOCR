@@ -23,7 +23,11 @@ MonkeyOCR: Document Parsing with a Structure-Recognition-Relation Triplet Paradi
 
 	
 ## News 
-* ```2026.07.13 ``` 🚀 We release [MonkeyOCRv2](https://github.com/Yuliang-Liu/MonkeyOCRv2), A Visual-Text Foundation Model for Document AI.
+> [!IMPORTANT]
+> 🚀 **MonkeyOCRv2 is here (July 2026)** — a document-native vision backbone plus a
+> 0.7B parser that is the new open-source SOTA on multilingual document parsing
+> (17 languages), now released under **Apache-2.0**.
+> 👉 **[Yuliang-Liu/MonkeyOCRv2](https://github.com/Yuliang-Liu/MonkeyOCRv2)** · [Paper](https://arxiv.org/abs/2607.11562) · [Demo](http://vlrlabmonkey.xyz:8891/)
 * ```2026.07.12 ``` 🚀 MonkeyOCR is accepted by SCIENCE CHINA Information Sciences.
 * ```2026.04.01 ``` 🚀 dots.mocr achieves the best open-source score on [MDPBench](https://arxiv.org/pdf/2603.28130), a 17-language document parsing benchmark!
 * ```2026.03.15 ``` 🚀 We release [dots.mocr](https://arxiv.org/pdf/2603.13032) Multimodal OCR: Parse Anything from Documents.
