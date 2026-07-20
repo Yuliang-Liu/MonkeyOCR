@@ -1273,5 +1273,11 @@ We would like to thank [MinerU](https://github.com/opendatalab/MinerU), [DocLayo
 ## Limitation
 Currently, MonkeyOCR do not yet fully support for photographed text, handwritten content, Traditional Chinese characters, or multilingual text. We plan to consider adding support for these features in future public releases. Additionally, our model is deployed on a single GPU, so if too many users upload files at the same time, issues like “This application is currently busy” may occur. The processing time shown on the demo page does not reflect computation time alone—it also includes result uploading and other overhead. During periods of high traffic, this time may be longer. The inference speeds of MonkeyOCR, MinerU, and Qwen2.5 VL-7B were measured on an H800 GPU.
 
-## Copyright
-Please don’t hesitate to share your valuable feedback — it’s a key motivation that drives us to continuously improve our framework. Note: Our model is intended for academic research and non-commercial use only. If you are interested in faster (smaller) or stronger one, please contact us at xbai@hust.edu.cn or ylliu@hust.edu.cn.
+## License and Commercial Use
+
+The source code in this repository is released under the Apache License 2.0.
+
+The MonkeyOCR v1 model weights are provided for academic research and non-commercial evaluation only. Commercial deployment, SaaS integration, redistribution, or production use requires a separate written commercial license.
+
+For commercial licensing inquiries, please contact xbai@hust.edu.cn or ylliu@hust.edu.cn.
+
