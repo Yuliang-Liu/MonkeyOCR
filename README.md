@@ -1245,14 +1245,15 @@ Get a Quick Hands-On Experience with Our Demo:  http://vlrlabmonkey.xyz:8891 (Th
 If you wish to refer to the baseline results published here, please use the following BibTeX entries:
 
 ```BibTeX
-@misc{li2025monkeyocrdocumentparsingstructurerecognitionrelation,
-      title={MonkeyOCR: Document Parsing with a Structure-Recognition-Relation Triplet Paradigm}, 
-      author={Zhang Li and Yuliang Liu and Qiang Liu and Zhiyin Ma and Ziyang Zhang and Shuo Zhang and Zidun Guo and Jiarui Zhang and Xinyu Wang and Xiang Bai},
-      year={2025},
-      eprint={2506.05218},
-      archivePrefix={arXiv},
-      primaryClass={cs.CV},
-      url={https://arxiv.org/abs/2506.05218}, 
+@article{li2026monkeyocr,
+  title   = {MonkeyOCR: Document Parsing with a Structure-Recognition-Relation Triplet Paradigm},
+  author  = {Li, Zhang and Liu, Yuliang and Liu, Qiang and Ma, Zhiyin and Zhang, Ziyang and Zhang, Shuo and Yang, Biao and Guo, Zidun and Zhang, Jiarui and Wang, Xinyu and Bai, Xiang},
+  journal = {Science China Information Sciences},
+  volume  = {69},
+  number  = {11},
+  pages   = {212105},
+  year    = {2026},
+  doi     = {10.1007/s11432-026-5121-6}
 }
 @misc{zheng2026multimodalocrparsedocuments,
       title={Multimodal OCR: Parse Anything from Documents}, 
